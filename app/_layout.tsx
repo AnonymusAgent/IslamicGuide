@@ -1,0 +1,39 @@
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppProvider, useApp } from '../contexts/AppContext';
+
+function AppContent() {
+  const { settings } = useApp();
+  return (
+    <>
+      <StatusBar style={settings.theme === 'dark' ? 'light' : 'dark'} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="quran/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="hadith/index" options={{ headerShown: false }} />
+        <Stack.Screen name="hadith/[collection]" options={{ headerShown: false }} />
+        <Stack.Screen name="duas/index" options={{ headerShown: false }} />
+        <Stack.Screen name="duas/[category]" options={{ headerShown: false }} />
+        <Stack.Screen name="tasbeeh" options={{ headerShown: false }} />
+        <Stack.Screen name="qibla" options={{ headerShown: false }} />
+        <Stack.Screen name="settings" options={{ headerShown: false }} />
+        <Stack.Screen name="bookmarks" options={{ headerShown: false }} />
+        <Stack.Screen name="search" options={{ headerShown: false }} />
+        <Stack.Screen name="prayer-guide/index" options={{ headerShown: false }} />
+        <Stack.Screen name="ai-guide" options={{ headerShown: false }} />
+        <Stack.Screen name="hijri-calendar" options={{ headerShown: false }} />
+      </Stack>
+    </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <SafeAreaProvider>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </SafeAreaProvider>
+  );
+}
