@@ -23,6 +23,11 @@ function AppContent() {
         <Stack.Screen name="prayer-guide/index" options={{ headerShown: false }} />
         <Stack.Screen name="ai-guide" options={{ headerShown: false }} />
         <Stack.Screen name="hijri-calendar" options={{ headerShown: false }} />
+        <Stack.Screen name="asma-ul-husna" options={{ headerShown: false }} />
+        <Stack.Screen name="islamic-names" options={{ headerShown: false }} />
+        <Stack.Screen name="ramadan" options={{ headerShown: false }} />
+        <Stack.Screen name="reading-stats" options={{ headerShown: false }} />
+        <Stack.Screen name="hajj-guide" options={{ headerShown: false }} />
       </Stack>
     </>
   );

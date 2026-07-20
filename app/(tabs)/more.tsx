@@ -13,25 +13,35 @@ export default function MoreScreen() {
 
   const MENU_SECTIONS = [
     {
-      title: 'AI & Learning',
+      title: 'AI & Guidance',
       items: [
         { id: 'ai-guide', title: 'AI Islamic Guide', subtitle: 'Ask questions with Quran & Hadith citations', icon: 'smart-toy', color: '#2D6B57', route: '/ai-guide' },
-        { id: 'prayer-guide', title: 'Prayer Guide', subtitle: 'Complete Salah Instructions', icon: 'mosque', color: '#2D2D6B', route: '/prayer-guide' },
-        { id: 'hijri-calendar', title: 'Hijri Calendar', subtitle: 'Islamic events & fasting tracker', icon: 'calendar-today', color: '#6B2D6B', route: '/hijri-calendar' },
+        { id: 'prayer-guide', title: 'Prayer Guide', subtitle: 'Complete Salah, Janazah & Eid instructions', icon: 'mosque', color: '#2D2D6B', route: '/prayer-guide' },
+        { id: 'hajj-guide', title: 'Hajj & Umrah Guide', subtitle: 'Step-by-step rituals, duas & packing list', icon: 'flight-takeoff', color: '#4A2D6B', route: '/hajj-guide' },
       ],
     },
     {
-      title: 'Islamic Library',
+      title: 'Islamic Content',
       items: [
         { id: 'hadith', title: 'Hadith Collections', subtitle: 'Bukhari, Muslim, Abu Dawood & more', icon: 'library-books', color: '#2D4A6B', route: '/hadith' },
         { id: 'duas', title: 'Duas & Azkar', subtitle: 'Morning, Evening & Daily Supplications', icon: 'favorite', color: '#6B2D4A', route: '/duas' },
+        { id: 'asma-ul-husna', title: '99 Names of Allah', subtitle: 'Asma-ul-Husna with explanations', icon: 'star', color: '#5B2D6B', route: '/asma-ul-husna' },
+        { id: 'islamic-names', title: 'Islamic Baby Names', subtitle: 'Boys & girls names with meanings', icon: 'child-care', color: '#2D6B8A', route: '/islamic-names' },
       ],
     },
     {
-      title: 'Islamic Tools',
+      title: 'Islamic Calendar',
+      items: [
+        { id: 'hijri-calendar', title: 'Hijri Calendar', subtitle: 'Islamic events & fasting tracker', icon: 'calendar-today', color: '#6B2D6B', route: '/hijri-calendar' },
+        { id: 'ramadan', title: 'Ramadan Companion', subtitle: 'Suhoor/Iftar times, fasting tracker', icon: 'nightlight', color: '#1B4D8A', route: '/ramadan' },
+      ],
+    },
+    {
+      title: 'Tools & Tracking',
       items: [
         { id: 'qibla', title: 'Qibla Compass', subtitle: 'Find the direction of Makkah', icon: 'explore', color: '#4A6B2D', route: '/qibla' },
         { id: 'tasbeeh', title: 'Digital Tasbeeh', subtitle: 'Counter with daily history', icon: 'loop', color: '#6B4A2D', route: '/tasbeeh' },
+        { id: 'stats', title: 'Reading Statistics', subtitle: 'Quran progress, achievements & streaks', icon: 'bar-chart', color: '#2D6B4A', route: '/reading-stats' },
         { id: 'search', title: 'Global Search', subtitle: 'Search Quran, Hadith & Duas', icon: 'search', color: '#2D6B6B', route: '/search' },
       ],
     },
@@ -51,7 +61,6 @@ export default function MoreScreen() {
           <Text style={[styles.headerTitle, { color: C.textPrimary }]}>More</Text>
           <Text style={[styles.headerSubtitle, { color: C.textMuted }]}>Islamic Resources & Tools</Text>
         </View>
-        {/* Quick Theme Toggle */}
         <Pressable
           style={[styles.themeToggle, { backgroundColor: `${C.gold}15`, borderColor: `${C.gold}30` }]}
           onPress={() => updateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
@@ -66,8 +75,8 @@ export default function MoreScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {MENU_SECTIONS.map(section => (
-          <View key={section.title} style={[styles.section, { paddingHorizontal: Spacing.md, marginTop: Spacing.lg }]}>
-            <Text style={[styles.sectionTitle, { color: C.textMuted }]}>{section.title}</Text>
+          <View key={section.title} style={[styles.section, { paddingHorizontal: Spacing.md, marginTop: Spacing.md }]}>
+            <Text style={[styles.sectionTitle, { color: C.textMuted }]}>{section.title.toUpperCase()}</Text>
             <View style={[styles.sectionCard, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
               {section.items.map((item, index) => (
                 <React.Fragment key={item.id}>
@@ -82,9 +91,11 @@ export default function MoreScreen() {
                       <Text style={[styles.menuTitle, { color: C.textPrimary }]}>{item.title}</Text>
                       <Text style={[styles.menuSubtitle, { color: C.textMuted }]}>{item.subtitle}</Text>
                     </View>
-                    <MaterialIcons name="chevron-right" size={20} color={C.textMuted} />
+                    <MaterialIcons name="chevron-right" size={18} color={C.textMuted} />
                   </Pressable>
-                  {index < section.items.length - 1 && <View style={[styles.divider, { backgroundColor: C.cardBorder }]} />}
+                  {index < section.items.length - 1 && (
+                    <View style={[styles.divider, { backgroundColor: C.cardBorder }]} />
+                  )}
                 </React.Fragment>
               ))}
             </View>
@@ -92,11 +103,11 @@ export default function MoreScreen() {
         ))}
 
         {/* App Info */}
-        <View style={[styles.appInfo, { margin: Spacing.md, marginTop: Spacing.xl, backgroundColor: C.card, borderRadius: Radius.lg, borderWidth: 1, borderColor: `${C.gold}20` }]}>
-          <Text style={[styles.appName, { color: C.gold }]}>Islamic Guide</Text>
-          <Text style={[styles.appVersion, { color: C.textMuted }]}>v1.0.0 · Powered by OnSpace AI</Text>
+        <View style={[styles.appInfo, { margin: Spacing.md, marginTop: Spacing.xl, backgroundColor: `${C.primary}20`, borderRadius: Radius.lg, borderWidth: 1, borderColor: `${C.gold}20` }]}>
+          <Text style={[styles.appName, { color: C.gold }]}>🕌 Islamic Guide</Text>
+          <Text style={[styles.appVersion, { color: C.textMuted }]}>v2.0.0 · Powered by OnSpace AI</Text>
           <Text style={[styles.appDesc, { color: C.textSecondary }]}>
-            Quran with word-by-word translation, authentic Hadith collections, daily Duas, AI Islamic Guide with citations, Hijri Calendar, Prayer Times, and Qibla Compass.
+            Complete Quran with word-by-word, authentic Hadith, Duas, AI Guide, 99 Names, Islamic Names, Ramadan Companion, Hajj Guide, Prayer Times, Qibla, Tasbeeh & more.
           </Text>
         </View>
 
@@ -128,11 +139,10 @@ const styles = StyleSheet.create({
   },
   section: {},
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: Spacing.sm,
+    letterSpacing: 1.2,
+    marginBottom: Spacing.xs,
   },
   sectionCard: {
     borderRadius: Radius.lg,
@@ -153,8 +163,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   menuInfo: { flex: 1 },
-  menuTitle: { fontSize: 16, fontWeight: '600' },
-  menuSubtitle: { fontSize: 13, marginTop: 1 },
+  menuTitle: { fontSize: 15, fontWeight: '600' },
+  menuSubtitle: { fontSize: 12, marginTop: 1 },
   divider: { height: 1, marginLeft: 44 + Spacing.md * 2 },
   appInfo: { padding: Spacing.md, alignItems: 'center' },
   appName: { fontSize: 16, fontWeight: '700' },
