@@ -28,6 +28,7 @@ function AppContent() {
         <Stack.Screen name="ramadan" options={{ headerShown: false }} />
         <Stack.Screen name="reading-stats" options={{ headerShown: false }} />
         <Stack.Screen name="hajj-guide" options={{ headerShown: false }} />
+        <Stack.Screen name="audio-manager" options={{ headerShown: false }} />
       </Stack>
     </>
   );

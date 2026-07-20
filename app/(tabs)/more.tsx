@@ -43,6 +43,7 @@ export default function MoreScreen() {
         { id: 'tasbeeh', title: 'Digital Tasbeeh', subtitle: 'Counter with daily history', icon: 'loop', color: '#6B4A2D', route: '/tasbeeh' },
         { id: 'stats', title: 'Reading Statistics', subtitle: 'Quran progress, achievements & streaks', icon: 'bar-chart', color: '#2D6B4A', route: '/reading-stats' },
         { id: 'search', title: 'Global Search', subtitle: 'Search Quran, Hadith & Duas', icon: 'search', color: '#2D6B6B', route: '/search' },
+        { id: 'audio', title: 'Audio Library', subtitle: 'Download & manage offline recitations', icon: 'headphones', color: '#6B2D5B', route: '/audio-manager' },
       ],
     },
     {

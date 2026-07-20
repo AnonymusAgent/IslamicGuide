@@ -1,114 +1,170 @@
-// Islamic App Design Tokens — Dynamic Theme Support
+// Islamic App Design Tokens — Production-Grade Dynamic Theme System
+import { Appearance } from 'react-native';
+
 export const DarkColors = {
-  // Primary Brand
-  primary: '#1B4D3E',
-  primaryLight: '#2D6B57',
-  primaryDark: '#0F2E25',
+  // Primary Brand — Deep Emerald
+  primary: '#1B5E4A',
+  primaryLight: '#2E7D5E',
+  primaryDark: '#0D3526',
 
-  // Accent
-  gold: '#C9A84C',
-  goldLight: '#E8C87A',
-  goldDark: '#A07830',
+  // Accent — Warm Gold
+  gold: '#D4AA5A',
+  goldLight: '#EDD080',
+  goldDark: '#AA8430',
 
-  // Surface
-  background: '#0D1F1A',
-  surface: '#152B24',
-  surfaceElevated: '#1E3D33',
-  card: '#1A3028',
-  cardBorder: '#2A4A3E',
+  // Surface Hierarchy
+  background: '#0A1A14',
+  surface: '#111E18',
+  surfaceElevated: '#172A20',
+  card: '#162219',
+  cardBorder: '#233D2E',
+  divider: '#1C3228',
 
-  // Text
-  textPrimary: '#F5F0E8',
-  textSecondary: '#A8C4BB',
-  textMuted: '#6B8F84',
-  textArabic: '#F0E6D0',
+  // Text — High contrast for accessibility
+  textPrimary: '#F2EDE0',       // WCAG AA on dark bg
+  textSecondary: '#BDCFC7',    // Medium contrast
+  textMuted: '#7A9B8E',        // Subtle
+  textArabic: '#F5ECD5',       // Warm for Arabic script
+  textInverse: '#0A1A14',
 
   // Semantic
-  success: '#4CAF7D',
-  warning: '#E8A94C',
-  error: '#E85C4A',
-  info: '#4A9BE8',
+  success: '#52C98A',
+  successBg: '#0F2E1E',
+  warning: '#F0B450',
+  warningBg: '#2A1E08',
+  error: '#F06A5A',
+  errorBg: '#2A0F0A',
+  info: '#5AABF0',
+  infoBg: '#0A1E2A',
 
-  // Sajdah, Ruku indicators
-  sajdah: '#C9A84C',
-  ruku: '#4A9BE8',
-  hizb: '#9B59B6',
+  // Quran Reader
+  sajdah: '#D4AA5A',
+  ruku: '#5AABF0',
+  hizb: '#B06AF0',
+  tajweedGhunna: '#4CAF7D',
+  tajweedMadd: '#5AABF0',
+  tajweedQalqalah: '#F0B450',
+  tajweedIkhfa: '#D4AA5A',
+  tajweedIdgham: '#52C98A',
 
-  // Prayer times
-  fajr: '#4A6B8A',
-  sunrise: '#E8C87A',
-  dhuhr: '#F5A623',
-  asr: '#E8803A',
-  maghrib: '#C96B4A',
-  isha: '#2D3B7A',
+  // Prayer Time Colors
+  fajr: '#2D5A7A',
+  sunrise: '#D4AA5A',
+  dhuhr: '#F0A020',
+  asr: '#E87840',
+  maghrib: '#C85040',
+  isha: '#2A3580',
+
+  // Chat
+  aiMessage: '#162A22',
+  userMessage: '#0D2E22',
+  chatInput: '#131F18',
+  chatBubbleBorder: '#233D2E',
 
   // Overlay
-  overlay: 'rgba(0,0,0,0.6)',
-  overlayLight: 'rgba(0,0,0,0.3)',
+  overlay: 'rgba(0,0,0,0.75)',
+  overlayLight: 'rgba(0,0,0,0.4)',
+  overlayCard: 'rgba(10,26,20,0.95)',
 
-  // AI Chat
-  aiMessage: '#1E3D33',
-  userMessage: '#0F3D2D',
-  chatInput: '#1A3028',
+  // Navigation
+  tabBarBg: '#0D1A14',
+  tabBarBorder: '#1C3228',
+  statusBar: 'light' as const,
+
+  // Compass
+  compassBg: '#0D1A14',
+  compassRing: '#D4AA5A',
+  compassNeedle: '#D4AA5A',
+  compassNeedleBack: '#4A6A58',
 };
 
 export const LightColors = {
   // Primary Brand
-  primary: '#1B4D3E',
-  primaryLight: '#2D6B57',
-  primaryDark: '#0F2E25',
+  primary: '#1B5E4A',
+  primaryLight: '#2E7D5E',
+  primaryDark: '#0D3526',
 
-  // Accent
-  gold: '#A07830',
+  // Accent — Richer gold for light mode
+  gold: '#9A6A1A',
   goldLight: '#C9A84C',
-  goldDark: '#7A5C20',
+  goldDark: '#6A4A10',
 
-  // Surface
-  background: '#F5F0E8',
+  // Surface Hierarchy
+  background: '#F5F0E6',
   surface: '#FFFFFF',
-  surfaceElevated: '#F0EAE0',
+  surfaceElevated: '#EDE8DC',
   card: '#FAFAF5',
-  cardBorder: '#E0D8C8',
+  cardBorder: '#DDD5C0',
+  divider: '#E8E0CE',
 
-  // Text
-  textPrimary: '#1A2E28',
-  textSecondary: '#4A6B62',
-  textMuted: '#8A9E99',
-  textArabic: '#2A3E35',
+  // Text — High contrast for light mode
+  textPrimary: '#1A2820',       // WCAG AAA on white
+  textSecondary: '#3D5A4E',
+  textMuted: '#7A8E86',
+  textArabic: '#1E3028',        // Deep for Arabic script
+  textInverse: '#F5F0E6',
 
   // Semantic
-  success: '#2E7D52',
-  warning: '#B8772A',
-  error: '#C0392B',
-  info: '#2A6BB0',
+  success: '#1E6E42',
+  successBg: '#E8F5EE',
+  warning: '#8A5A10',
+  warningBg: '#FFF3E0',
+  error: '#B02A20',
+  errorBg: '#FDECEA',
+  info: '#1A5A9E',
+  infoBg: '#E6F2FF',
 
-  // Sajdah, Ruku indicators
-  sajdah: '#A07830',
-  ruku: '#2A6BB0',
-  hizb: '#7B2D8B',
+  // Quran Reader
+  sajdah: '#9A6A1A',
+  ruku: '#1A5A9E',
+  hizb: '#6A1A9A',
+  tajweedGhunna: '#1E6E42',
+  tajweedMadd: '#1A5A9E',
+  tajweedQalqalah: '#8A5A10',
+  tajweedIkhfa: '#9A6A1A',
+  tajweedIdgham: '#1E6E42',
 
-  // Prayer times
-  fajr: '#2D4A6A',
-  sunrise: '#B8772A',
-  dhuhr: '#C5841C',
-  asr: '#B85E2A',
-  maghrib: '#9B4A2E',
-  isha: '#1C2A6A',
+  // Prayer Time Colors
+  fajr: '#1A3A5A',
+  sunrise: '#9A6A1A',
+  dhuhr: '#B07010',
+  asr: '#A05020',
+  maghrib: '#882A18',
+  isha: '#1A1F6A',
+
+  // Chat
+  aiMessage: '#EBF5EE',
+  userMessage: '#D8EDE2',
+  chatInput: '#FFFFFF',
+  chatBubbleBorder: '#C8D8CE',
 
   // Overlay
-  overlay: 'rgba(0,0,0,0.4)',
-  overlayLight: 'rgba(0,0,0,0.15)',
+  overlay: 'rgba(0,0,0,0.5)',
+  overlayLight: 'rgba(0,0,0,0.2)',
+  overlayCard: 'rgba(245,240,230,0.97)',
 
-  // AI Chat
-  aiMessage: '#EBF5F0',
-  userMessage: '#D4EDE4',
-  chatInput: '#FFFFFF',
+  // Navigation
+  tabBarBg: '#FFFFFF',
+  tabBarBorder: '#E0D8C8',
+  statusBar: 'dark' as const,
+
+  // Compass
+  compassBg: '#F0EBE0',
+  compassRing: '#9A6A1A',
+  compassNeedle: '#9A6A1A',
+  compassNeedleBack: '#8A9E96',
 };
 
-// Default export — dark mode (for components that don't use theme context)
+// Default export — dark mode
 export const Colors = DarkColors;
 
-export function getColors(theme: 'dark' | 'light') {
+export type ThemeColors = typeof DarkColors;
+
+export function getColors(theme: 'dark' | 'light' | 'system'): ThemeColors {
+  if (theme === 'system') {
+    const colorScheme = Appearance.getColorScheme();
+    return colorScheme === 'light' ? LightColors : DarkColors;
+  }
   return theme === 'light' ? LightColors : DarkColors;
 }
 
@@ -116,23 +172,33 @@ export const Fonts = {
   arabic: 'System',
   body: 'System',
   sizes: {
-    arabic_xl: 32,
+    arabic_xl: 34,
     arabic_lg: 28,
     arabic_md: 24,
     arabic_sm: 20,
     h1: 28,
-    h2: 24,
-    h3: 20,
-    h4: 18,
+    h2: 22,
+    h3: 18,
+    h4: 16,
     body: 16,
     small: 14,
     xs: 12,
+    xxs: 10,
+  },
+  lineHeights: {
+    arabic_xl: 58,
+    arabic_lg: 48,
+    arabic_md: 42,
+    arabic_sm: 36,
+    body: 26,
+    small: 22,
   },
   weights: {
     regular: '400' as const,
     medium: '500' as const,
     semibold: '600' as const,
     bold: '700' as const,
+    heavy: '800' as const,
   },
 };
 
@@ -146,33 +212,49 @@ export const Spacing = {
 };
 
 export const Radius = {
+  xs: 4,
   sm: 8,
   md: 12,
   lg: 16,
-  xl: 24,
+  xl: 20,
+  xxl: 28,
   round: 100,
 };
 
 export const Shadow = {
   small: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   medium: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
     shadowRadius: 8,
-    elevation: 6,
+    elevation: 5,
+  },
+  large: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
   },
   gold: {
-    shadowColor: '#C9A84C',
+    shadowColor: '#D4AA5A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
 };
+
+// Responsive scaling helpers
+export function getResponsiveSize(base: number, screenWidth: number): number {
+  if (screenWidth < 360) return base * 0.875;
+  if (screenWidth > 600) return base * 1.125;
+  return base;
+}

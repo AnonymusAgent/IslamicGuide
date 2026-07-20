@@ -2,70 +2,99 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Pressable,
   TextInput, KeyboardAvoidingView, Platform, ActivityIndicator,
-  ScrollView, Clipboard,
+  ScrollView, Share, Modal, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Spacing, Radius } from '../constants/theme';
 import { useApp, AIMessage } from '../contexts/AppContext';
 
+// ── System Prompt ────────────────────────────────────────────────────────────
+
+const ISLAMIC_SYSTEM_PROMPT = `You are an expert Islamic scholar assistant trained on the Quran, Sahih al-Bukhari, Sahih Muslim, the four Sunans (Abu Dawud, Tirmidhi, Nasa'i, Ibn Majah), and major scholarly works.
+
+STRICT RULES:
+1. ALWAYS cite specific Quran references in format: (Surah Name, Chapter:Verse)
+2. ALWAYS cite Hadith with full reference: (Sahih al-Bukhari, Hadith No.) or (Sahih Muslim, Hadith No.)
+3. NEVER fabricate or paraphrase Quran verses — only cite real verses
+4. NEVER fabricate or attribute fake hadiths — only cite verified narrations
+5. Present all four Sunni madhab views (Hanafi, Maliki, Shafi'i, Hanbali) when rulings differ
+6. NEVER issue personal fatwas. For personal legal matters always say: "Please consult a qualified Islamic scholar"
+7. Mention hadith authenticity grade (Sahih, Hasan, Da'if) where relevant
+8. Format: Answer → Quranic Evidence → Hadith Evidence → Scholarly Notes
+9. Be respectful, scholarly, and thorough
+10. For non-Islamic topics: "I am an Islamic guidance assistant. Please ask about Islamic topics."`;
+
+// ── Suggested Questions ──────────────────────────────────────────────────────
+
 const SUGGESTED_QUESTIONS = [
-  'What does the Quran say about patience?',
-  'What is the importance of Salah in Islam?',
-  'Explain the five pillars of Islam',
-  'What are the conditions for a valid fast?',
-  'How should a Muslim deal with hardship?',
+  'What does the Quran say about patience in hardship?',
+  'What is the importance and reward of Salah?',
+  'Explain the five pillars of Islam with evidence',
+  'What are the conditions for a valid Wudu?',
+  'What is Tawakkul and how to practice it?',
   'What is the ruling on missing a prayer?',
-  'Explain Tawakkul (reliance on Allah)',
-  'What is the significance of Surah Al-Fatiha?',
+  'Explain the concept of Tawbah (repentance)',
+  'What are the virtues of Surah Al-Baqarah?',
+  'How to perform Ghusl correctly?',
+  'What does Islam say about kindness to parents?',
 ];
 
-const ISLAMIC_SYSTEM_PROMPT = `You are an expert Islamic scholar assistant. You must:
-1. ONLY provide information about Islam based on the Quran, authentic Hadith (primarily Sahih al-Bukhari, Sahih Muslim, and the four Sunan), scholarly consensus (Ijma), and established Fiqh.
-2. ALWAYS cite specific Quran verses (Surah:Ayah) and/or Hadith references (Book, Number) for every Islamic ruling or statement.
-3. Present the views of the four major Sunni schools (Hanafi, Maliki, Shafi'i, Hanbali) when there are scholarly differences, without declaring one universally correct.
-4. NEVER issue fatwas or personal rulings. Say "consult a qualified scholar" for complex personal matters.
-5. Format responses clearly with: Answer, Evidence (Quran/Hadith), Scholarly Notes.
-6. For non-Islamic topics, politely redirect: "This is an Islamic guidance assistant. Please ask about Islamic topics."
-7. Always maintain respect and follow Islamic etiquette.`;
+const TOPIC_CATEGORIES = [
+  { icon: '📖', label: 'Quran', queries: ['What is the greatest verse in the Quran?', 'Explain Surah Al-Fatiha', 'What does Surah Al-Ikhlas mean?'] },
+  { icon: '📚', label: 'Hadith', queries: ['What is the most important hadith?', 'Explain the hadith of Jibreel', 'What did the Prophet say about character?'] },
+  { icon: '🕌', label: 'Prayer', queries: ['How to perform Fajr prayer?', 'What are the pillars of Salah?', 'What invalidates the prayer?'] },
+  { icon: '🌙', label: 'Ramadan', queries: ['What are the virtues of Ramadan?', 'When should one break the fast?', 'What is Laylatul Qadr?'] },
+  { icon: '🤲', label: 'Duas', queries: ['Best dua for anxiety?', 'Dua for seeking forgiveness?', 'Morning and evening azkar'] },
+  { icon: '⚖️', label: 'Fiqh', queries: ['Is music permissible in Islam?', 'What is Zakat and who pays it?', 'Ruling on keeping a beard'] },
+];
 
 export default function AIGuideScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { aiMessages, addAIMessage, clearAIChat, colors } = useApp();
+  const {
+    aiMessages, addAIMessage, clearAIChat,
+    aiConversations, createConversation, deleteConversation, pinConversation,
+    activeConversationId, setActiveConversationId,
+    updateConversationTitle,
+    colors: C,
+  } = useApp();
+
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [showTopics, setShowTopics] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
-
-  const C = colors;
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    }, 150);
   }, []);
 
   useEffect(() => {
-    if (aiMessages.length > 0) scrollToBottom();
+    if (aiMessages.length > 0 || streamingText) scrollToBottom();
   }, [aiMessages.length, streamingText]);
 
   const sendMessage = async (text?: string) => {
-    const messageText = text || input.trim();
-    if (!messageText || isLoading) return;
+    const msg = (text || input).trim();
+    if (!msg || isLoading) return;
 
     setInput('');
     setIsLoading(true);
     setStreamingText('');
+    setShowTopics(false);
 
-    // Add user message
-    await addAIMessage({ role: 'user', content: messageText });
+    await addAIMessage({ role: 'user', content: msg });
 
-    // Build conversation history for context
-    const history = aiMessages.slice(-10).map(m => ({
-      role: m.role,
+    // Build conversation context (last 12 messages)
+    const contextMessages = aiMessages.slice(-12).map(m => ({
+      role: m.role as 'user' | 'assistant',
       content: m.content,
     }));
 
@@ -80,15 +109,16 @@ export default function AIGuideScreen() {
           model: 'google/gemini-3-flash-preview',
           messages: [
             { role: 'system', content: ISLAMIC_SYSTEM_PROMPT },
-            ...history,
-            { role: 'user', content: messageText },
+            ...contextMessages,
+            { role: 'user', content: msg },
           ],
           stream: true,
-          max_tokens: 1200,
+          max_tokens: 1500,
+          temperature: 0.3,
         }),
       });
 
-      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const reader = response.body?.getReader();
       let fullText = '';
@@ -99,8 +129,7 @@ export default function AIGuideScreen() {
           const { done, value } = await reader.read();
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
-          for (const line of lines) {
+          for (const line of chunk.split('\n')) {
             if (line.startsWith('data: ') && line !== 'data: [DONE]') {
               try {
                 const data = JSON.parse(line.slice(6));
@@ -115,88 +144,176 @@ export default function AIGuideScreen() {
         }
       } else {
         const data = await response.json();
-        fullText = data.choices?.[0]?.message?.content || 'I could not generate a response. Please try again.';
+        fullText = data.choices?.[0]?.message?.content || 'Unable to generate a response. Please try again.';
       }
 
       setStreamingText('');
       if (fullText) {
         await addAIMessage({ role: 'assistant', content: fullText });
+        // Auto-title first conversation
+        if (aiMessages.length === 0 && activeConversationId) {
+          const shortTitle = msg.length > 40 ? msg.slice(0, 40) + '...' : msg;
+          updateConversationTitle(activeConversationId, shortTitle);
+        }
       }
-    } catch (err) {
+    } catch {
       setStreamingText('');
       await addAIMessage({
         role: 'assistant',
-        content: 'I apologize, I am unable to connect right now. Please check your internet connection and try again.\n\nIn the meantime, you can explore the Quran, Hadith, and Duas sections for authentic Islamic guidance.',
+        content: [
+          '**Connection Error**',
+          '',
+          'I am unable to connect right now. Please check your internet connection and try again.',
+          '',
+          'In the meantime, explore the **Quran**, **Hadith**, and **Duas** sections for authentic Islamic guidance.',
+        ].join('\n'),
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const copyMessage = (text: string) => {
-    Clipboard.setString(text);
+  const shareMessage = async (content: string) => {
+    try {
+      await Share.share({ message: content + '\n\n— Islamic Guide App' });
+    } catch { /* silent */ }
   };
 
-  const renderMessage = ({ item }: { item: AIMessage }) => {
+  const renderMessage = useCallback(({ item, index }: { item: AIMessage; index: number }) => {
     const isUser = item.role === 'user';
+    const showTime = index === 0 ||
+      item.timestamp - aiMessages[index - 1]?.timestamp > 300000; // 5 min gap
+
     return (
-      <View style={[styles.messageRow, isUser ? styles.userRow : styles.aiRow]}>
-        {!isUser && (
-          <View style={[styles.avatar, { backgroundColor: `${C.primary}60`, borderColor: `${C.gold}30` }]}>
-            <Text style={styles.avatarText}>☪</Text>
-          </View>
-        )}
-        <Pressable
-          style={[
-            styles.bubble,
-            isUser
-              ? [styles.userBubble, { backgroundColor: C.userMessage, borderColor: `${C.gold}30` }]
-              : [styles.aiBubble, { backgroundColor: C.aiMessage, borderColor: `${C.primary}40` }],
-          ]}
-          onLongPress={() => copyMessage(item.content)}
-        >
-          <Text style={[styles.bubbleText, { color: C.textPrimary }]}>{item.content}</Text>
-          <Text style={[styles.messageTime, { color: C.textMuted }]}>
+      <View>
+        {showTime && (
+          <Text style={[styles.timeLabel, { color: C.textMuted }]}>
             {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
-        </Pressable>
-        {isUser && (
-          <View style={[styles.avatar, { backgroundColor: `${C.gold}20`, borderColor: `${C.gold}30` }]}>
-            <MaterialIcons name="person" size={18} color={C.gold} />
-          </View>
         )}
+        <View style={[styles.messageRow, isUser ? styles.userRow : styles.aiRow]}>
+          {!isUser && (
+            <View style={[styles.aiAvatar, { backgroundColor: C.primary, borderColor: `${C.gold}40` }]}>
+              <Text style={styles.aiAvatarText}>☪</Text>
+            </View>
+          )}
+          <View style={[
+            styles.bubble,
+            isUser
+              ? [styles.userBubble, { backgroundColor: C.userMessage, borderColor: `${C.gold}25` }]
+              : [styles.aiBubble, { backgroundColor: C.aiMessage, borderColor: `${C.cardBorder}` }],
+          ]}>
+            {/* Simple markdown-like rendering */}
+            {renderMarkdown(item.content, C)}
+
+            {/* Message actions */}
+            {!isUser && (
+              <View style={[styles.msgActions, { borderTopColor: C.divider }]}>
+                <Pressable
+                  style={styles.msgAction}
+                  onPress={() => shareMessage(item.content)}
+                >
+                  <MaterialIcons name="share" size={13} color={C.textMuted} />
+                </Pressable>
+                <Pressable
+                  style={styles.msgAction}
+                  onPress={() => sendMessage('Please elaborate on that.')}
+                >
+                  <MaterialIcons name="refresh" size={13} color={C.textMuted} />
+                  <Text style={[styles.msgActionText, { color: C.textMuted }]}>Elaborate</Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+          {isUser && (
+            <View style={[styles.userAvatar, { backgroundColor: `${C.gold}20`, borderColor: `${C.gold}30` }]}>
+              <MaterialIcons name="person" size={18} color={C.gold} />
+            </View>
+          )}
+        </View>
       </View>
     );
-  };
+  }, [C, aiMessages]);
 
-  const showSuggestions = aiMessages.length === 0 && !isLoading;
+  const showEmpty = aiMessages.length === 0 && !isLoading;
 
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: C.background, paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
     >
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: C.cardBorder }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <MaterialIcons name="arrow-back" size={24} color={C.textPrimary} />
-        </Pressable>
-        <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: C.textPrimary }]}>AI Islamic Guide</Text>
-          <Text style={[styles.headerSub, { color: C.textMuted }]}>Powered by Gemini 3</Text>
+      <LinearGradient colors={[C.primaryDark, C.primary]} style={styles.header}>
+        <View style={styles.headerRow}>
+          <Pressable onPress={() => router.back()} style={styles.headerBtn}>
+            <MaterialIcons name="arrow-back" size={24} color={C.textPrimary} />
+          </Pressable>
+          <View style={styles.headerInfo}>
+            <Text style={[styles.headerTitle, { color: C.textPrimary }]}>AI Islamic Guide</Text>
+            <View style={styles.headerMeta}>
+              <View style={[styles.onlineDot, { backgroundColor: C.success }]} />
+              <Text style={[styles.headerSub, { color: C.textSecondary }]}>Powered by Gemini 3 · Cites Quran & Hadith</Text>
+            </View>
+          </View>
+          <View style={styles.headerActions}>
+            <Pressable
+              style={[styles.headerBtn, { backgroundColor: `${C.gold}20` }]}
+              onPress={() => setShowTopics(!showTopics)}
+            >
+              <MaterialIcons name="apps" size={20} color={C.gold} />
+            </Pressable>
+            <Pressable onPress={clearAIChat} style={styles.headerBtn}>
+              <MaterialIcons name="delete-outline" size={20} color={C.textMuted} />
+            </Pressable>
+          </View>
         </View>
-        <Pressable onPress={clearAIChat} style={styles.clearBtn}>
-          <MaterialIcons name="delete-outline" size={22} color={C.textMuted} />
-        </Pressable>
-      </View>
+      </LinearGradient>
 
       {/* Disclaimer */}
-      <View style={[styles.disclaimer, { backgroundColor: `${C.warning}15`, borderColor: `${C.warning}30` }]}>
-        <MaterialIcons name="info-outline" size={14} color={C.warning} />
+      <View style={[styles.disclaimer, { backgroundColor: `${C.warning}12`, borderColor: `${C.warning}25` }]}>
+        <MaterialIcons name="info-outline" size={13} color={C.warning} />
         <Text style={[styles.disclaimerText, { color: C.textSecondary }]}>
-          Always verify with qualified scholars. This AI cites sources but is not a fatwa service.
+          Always verify with qualified scholars. Not a fatwa service.
         </Text>
       </View>
+
+      {/* Topic Categories Panel */}
+      {showTopics && (
+        <View style={[styles.topicsPanel, { backgroundColor: C.surface, borderBottomColor: C.cardBorder }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topicsScroll}>
+            {TOPIC_CATEGORIES.map((cat, i) => (
+              <Pressable
+                key={i}
+                style={[
+                  styles.topicChip,
+                  { backgroundColor: selectedCategory === i ? `${C.gold}20` : C.card, borderColor: selectedCategory === i ? C.gold : C.cardBorder },
+                ]}
+                onPress={() => setSelectedCategory(selectedCategory === i ? null : i)}
+              >
+                <Text style={styles.topicIcon}>{cat.icon}</Text>
+                <Text style={[styles.topicLabel, { color: selectedCategory === i ? C.gold : C.textSecondary }]}>
+                  {cat.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          {selectedCategory !== null && (
+            <View style={[styles.topicQuestions, { borderTopColor: C.cardBorder }]}>
+              {TOPIC_CATEGORIES[selectedCategory].queries.map((q, i) => (
+                <Pressable
+                  key={i}
+                  style={[styles.topicQuestion, { borderBottomColor: C.divider }]}
+                  onPress={() => { sendMessage(q); setShowTopics(false); }}
+                >
+                  <MaterialIcons name="chevron-right" size={16} color={C.gold} />
+                  <Text style={[styles.topicQuestionText, { color: C.textPrimary }]}>{q}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Messages */}
       <FlatList
@@ -204,32 +321,43 @@ export default function AIGuideScreen() {
         data={aiMessages}
         keyExtractor={item => item.id}
         renderItem={renderMessage}
-        contentContainerStyle={[styles.messages, showSuggestions && styles.messagesCenter]}
+        contentContainerStyle={[styles.messages, showEmpty && styles.messagesEmpty]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.welcomeEmoji}>☪️</Text>
-            <Text style={[styles.welcomeTitle, { color: C.textPrimary }]}>
-              بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
-            </Text>
-            <Text style={[styles.welcomeSubtitle, { color: C.textSecondary }]}>
-              Ask questions about the Quran, Hadith, Islamic rulings, and more. All answers include authentic citations.
-            </Text>
+            <LinearGradient
+              colors={[`${C.primary}30`, `${C.primaryDark}20`]}
+              style={[styles.welcomeGradient, { borderColor: `${C.gold}20` }]}
+            >
+              <Text style={styles.welcomeEmoji}>☪️</Text>
+              <Text style={[styles.welcomeArabic, { color: C.gold }]}>
+                بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
+              </Text>
+              <Text style={[styles.welcomeTitle, { color: C.textPrimary }]}>
+                AI Islamic Guide
+              </Text>
+              <Text style={[styles.welcomeDesc, { color: C.textSecondary }]}>
+                Ask questions about the Quran, Hadith, Islamic rulings, prayer, fasting, and more.
+                All answers include authentic citations from primary sources.
+              </Text>
+            </LinearGradient>
           </View>
         }
         ListFooterComponent={
           (isLoading || streamingText) ? (
-            <View style={[styles.messageRow, styles.aiRow]}>
-              <View style={[styles.avatar, { backgroundColor: `${C.primary}60`, borderColor: `${C.gold}30` }]}>
-                <Text style={styles.avatarText}>☪</Text>
+            <View style={[styles.messageRow, styles.aiRow, { paddingHorizontal: Spacing.md, paddingBottom: 8 }]}>
+              <View style={[styles.aiAvatar, { backgroundColor: C.primary, borderColor: `${C.gold}40` }]}>
+                <Text style={styles.aiAvatarText}>☪</Text>
               </View>
-              <View style={[styles.bubble, styles.aiBubble, { backgroundColor: C.aiMessage, borderColor: `${C.primary}40` }]}>
+              <View style={[styles.bubble, styles.aiBubble, { backgroundColor: C.aiMessage, borderColor: C.cardBorder }]}>
                 {streamingText ? (
-                  <Text style={[styles.bubbleText, { color: C.textPrimary }]}>{streamingText}</Text>
+                  <Text style={[styles.msgText, { color: C.textPrimary }]}>{streamingText}</Text>
                 ) : (
-                  <View style={styles.typingDots}>
+                  <View style={styles.typingRow}>
                     <ActivityIndicator size="small" color={C.gold} />
-                    <Text style={[styles.typingText, { color: C.textMuted }]}>Researching sources...</Text>
+                    <Text style={[styles.typingText, { color: C.textMuted }]}>
+                      Researching sources...
+                    </Text>
                   </View>
                 )}
               </View>
@@ -238,26 +366,34 @@ export default function AIGuideScreen() {
         }
       />
 
-      {/* Suggested Questions */}
-      {showSuggestions && (
-        <View style={styles.suggestions}>
-          <Text style={[styles.suggestionsLabel, { color: C.textMuted }]}>Suggested Questions</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.suggestionsScroll}>
+      {/* Suggested Questions (only when chat is empty) */}
+      {showEmpty && (
+        <View style={[styles.suggestions, { borderTopColor: C.divider }]}>
+          <Text style={[styles.suggestLabel, { color: C.textMuted }]}>Suggested Questions</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.suggestScroll}
+          >
             {SUGGESTED_QUESTIONS.map((q, i) => (
               <Pressable
                 key={i}
-                style={[styles.suggestionChip, { backgroundColor: C.card, borderColor: `${C.gold}30` }]}
+                style={[styles.suggestChip, { backgroundColor: C.card, borderColor: `${C.gold}25` }]}
                 onPress={() => sendMessage(q)}
               >
-                <Text style={[styles.suggestionText, { color: C.textSecondary }]}>{q}</Text>
+                <Text style={[styles.suggestText, { color: C.textSecondary }]}>{q}</Text>
               </Pressable>
             ))}
           </ScrollView>
         </View>
       )}
 
-      {/* Input */}
-      <View style={[styles.inputArea, { backgroundColor: C.surface, borderTopColor: C.cardBorder, paddingBottom: insets.bottom + 8 }]}>
+      {/* Input Area */}
+      <View style={[styles.inputArea, {
+        backgroundColor: C.surface,
+        borderTopColor: C.cardBorder,
+        paddingBottom: Math.max(insets.bottom + 8, 16),
+      }]}>
         <View style={[styles.inputRow, { backgroundColor: C.chatInput, borderColor: C.cardBorder }]}>
           <TextInput
             ref={inputRef}
@@ -267,17 +403,27 @@ export default function AIGuideScreen() {
             value={input}
             onChangeText={setInput}
             multiline
-            maxLength={1000}
-            returnKeyType="send"
-            onSubmitEditing={() => sendMessage()}
-            blurOnSubmit={false}
+            maxLength={1500}
           />
           <Pressable
-            style={[styles.sendBtn, { backgroundColor: input.trim() && !isLoading ? C.gold : `${C.gold}40` }]}
+            style={[
+              styles.sendBtn,
+              {
+                backgroundColor: input.trim() && !isLoading ? C.gold : `${C.gold}30`,
+              },
+            ]}
             onPress={() => sendMessage()}
             disabled={!input.trim() || isLoading}
           >
-            <MaterialIcons name="send" size={18} color={input.trim() && !isLoading ? C.primaryDark : C.textMuted} />
+            {isLoading ? (
+              <ActivityIndicator size="small" color={C.primaryDark} />
+            ) : (
+              <MaterialIcons
+                name="send"
+                size={18}
+                color={input.trim() && !isLoading ? C.primaryDark : C.textMuted}
+              />
+            )}
           </Pressable>
         </View>
       </View>
@@ -285,109 +431,194 @@ export default function AIGuideScreen() {
   );
 }
 
+// ── Simple Markdown Renderer ──────────────────────────────────────────────────
+
+function renderMarkdown(text: string, C: any) {
+  const lines = text.split('\n');
+  return (
+    <View style={{ gap: 3 }}>
+      {lines.map((line, i) => {
+        if (line.startsWith('**') && line.endsWith('**') && line.length > 4) {
+          const content = line.slice(2, -2);
+          return <Text key={i} style={[styles.msgBold, { color: C.textPrimary }]}>{content}</Text>;
+        }
+        if (line.startsWith('## ')) {
+          return <Text key={i} style={[styles.msgHeading, { color: C.gold }]}>{line.slice(3)}</Text>;
+        }
+        if (line.startsWith('# ')) {
+          return <Text key={i} style={[styles.msgH1, { color: C.gold }]}>{line.slice(2)}</Text>;
+        }
+        if (line.startsWith('- ') || line.startsWith('• ')) {
+          return (
+            <View key={i} style={styles.msgListItem}>
+              <Text style={[styles.msgBullet, { color: C.gold }]}>•</Text>
+              <Text style={[styles.msgText, { color: C.textPrimary, flex: 1 }]}>{line.slice(2)}</Text>
+            </View>
+          );
+        }
+        if (line === '') return <View key={i} style={{ height: 4 }} />;
+        // Bold within text
+        if (line.includes('**')) {
+          const parts = line.split(/\*\*(.*?)\*\*/g);
+          return (
+            <Text key={i} style={[styles.msgText, { color: C.textPrimary }]}>
+              {parts.map((p, pi) =>
+                pi % 2 === 1
+                  ? <Text key={pi} style={{ fontWeight: '700', color: C.textPrimary }}>{p}</Text>
+                  : p
+              )}
+            </Text>
+          );
+        }
+        return <Text key={i} style={[styles.msgText, { color: C.textPrimary }]}>{line}</Text>;
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    gap: Spacing.sm,
-  },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerCenter: { flex: 1 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  headerSub: { fontSize: 12, marginTop: 1 },
-  clearBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+
+  header: { paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingTop: 4 },
+  headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  headerInfo: { flex: 1 },
+  headerTitle: { fontSize: 17, fontWeight: '700' },
+  headerMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 },
+  onlineDot: { width: 6, height: 6, borderRadius: 3 },
+  headerSub: { fontSize: 11 },
+  headerActions: { flexDirection: 'row', gap: 4 },
+
   disclaimer: {
     flexDirection: 'row',
     gap: 6,
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderBottomWidth: 1,
   },
-  disclaimerText: { flex: 1, fontSize: 11, lineHeight: 16 },
-  messages: { padding: Spacing.md, paddingBottom: 20, gap: 16 },
-  messagesCenter: { flexGrow: 1, justifyContent: 'center' },
-  emptyState: { alignItems: 'center', paddingHorizontal: Spacing.xl, gap: 12 },
-  welcomeEmoji: { fontSize: 48 },
-  welcomeTitle: { fontSize: 22, fontWeight: '400', textAlign: 'center' },
-  welcomeSubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  disclaimerText: { flex: 1, fontSize: 11, lineHeight: 15 },
+
+  topicsPanel: { borderBottomWidth: 1 },
+  topicsScroll: { paddingHorizontal: Spacing.md, paddingVertical: 8, gap: 8 },
+  topicChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: Radius.round,
+    borderWidth: 1,
+  },
+  topicIcon: { fontSize: 14 },
+  topicLabel: { fontSize: 13, fontWeight: '600' },
+  topicQuestions: { borderTopWidth: 1 },
+  topicQuestion: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderBottomWidth: 1 },
+  topicQuestionText: { fontSize: 14, flex: 1 },
+
+  messages: { padding: Spacing.md, paddingBottom: 20, gap: 12 },
+  messagesEmpty: { flex: 1, justifyContent: 'center' },
+
+  emptyState: { alignItems: 'center', paddingHorizontal: Spacing.lg },
+  welcomeGradient: {
+    padding: Spacing.lg,
+    borderRadius: Radius.xxl,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: 10,
+    maxWidth: 360,
+    width: '100%',
+  },
+  welcomeEmoji: { fontSize: 44 },
+  welcomeArabic: { fontSize: 18, textAlign: 'center' },
+  welcomeTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center' },
+  welcomeDesc: { fontSize: 14, textAlign: 'center', lineHeight: 22 },
+
+  timeLabel: { textAlign: 'center', fontSize: 11, marginVertical: 6 },
   messageRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-end' },
   userRow: { justifyContent: 'flex-end' },
   aiRow: { justifyContent: 'flex-start' },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+
+  aiAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    flexShrink: 0,
+  },
+  aiAvatarText: { fontSize: 17 },
+  userAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     flexShrink: 0,
   },
-  avatarText: { fontSize: 18 },
-  bubble: {
-    maxWidth: '78%',
-    padding: 12,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
+
+  bubble: { maxWidth: '80%', padding: 12, borderRadius: Radius.lg, borderWidth: 1 },
+  userBubble: { borderBottomRightRadius: 4 },
+  aiBubble: { borderBottomLeftRadius: 4 },
+
+  msgText: { fontSize: 14, lineHeight: 22 },
+  msgBold: { fontSize: 14, fontWeight: '700', lineHeight: 22 },
+  msgHeading: { fontSize: 15, fontWeight: '700', lineHeight: 22, marginTop: 4 },
+  msgH1: { fontSize: 16, fontWeight: '800', lineHeight: 24, marginTop: 4 },
+  msgListItem: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
+  msgBullet: { fontSize: 14, lineHeight: 22, fontWeight: '700' },
+
+  msgActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
   },
-  userBubble: {
-    borderBottomRightRadius: 4,
-  },
-  aiBubble: {
-    borderBottomLeftRadius: 4,
-  },
-  bubbleText: { fontSize: 14, lineHeight: 22 },
-  messageTime: { fontSize: 10, marginTop: 4, textAlign: 'right' },
-  typingDots: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 4 },
+  msgAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  msgActionText: { fontSize: 11 },
+
+  typingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 2 },
   typingText: { fontSize: 13 },
-  suggestions: { paddingTop: Spacing.sm },
-  suggestionsLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+
+  suggestions: { paddingTop: 8, borderTopWidth: 1 },
+  suggestLabel: {
+    fontSize: 10,
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 1,
     paddingHorizontal: Spacing.md,
     marginBottom: 6,
   },
-  suggestionsScroll: { paddingHorizontal: Spacing.md },
-  suggestionChip: {
+  suggestScroll: { paddingHorizontal: Spacing.md, paddingBottom: 8, gap: 8 },
+  suggestChip: {
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderRadius: Radius.lg,
     borderWidth: 1,
-    marginRight: 8,
-    maxWidth: 220,
+    maxWidth: 230,
   },
-  suggestionText: { fontSize: 13, lineHeight: 18 },
-  inputArea: {
-    borderTopWidth: 1,
-    padding: Spacing.sm,
-  },
+  suggestText: { fontSize: 13, lineHeight: 18 },
+
+  inputArea: { borderTopWidth: 1, padding: Spacing.sm },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    borderRadius: Radius.lg,
+    borderRadius: Radius.xl,
     borderWidth: 1,
     paddingLeft: Spacing.md,
     paddingRight: 6,
     paddingVertical: 6,
     gap: 8,
   },
-  textInput: {
-    flex: 1,
-    fontSize: 15,
-    maxHeight: 120,
-    paddingTop: 6,
-    paddingBottom: 6,
-  },
+  textInput: { flex: 1, fontSize: 15, maxHeight: 120, paddingTop: 6, paddingBottom: 6 },
   sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

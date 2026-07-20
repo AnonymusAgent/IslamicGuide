@@ -1,188 +1,622 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ActivityIndicator, Animated,
+  View, Text, StyleSheet, Pressable, ActivityIndicator,
+  Animated, Dimensions, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Spacing, Radius } from '../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Spacing, Radius, Shadow } from '../constants/theme';
 import { useApp } from '../contexts/AppContext';
 import { useQibla } from '../hooks/usePrayer';
 import { Magnetometer } from 'expo-sensors';
+
+const { width } = Dimensions.get('window');
+const COMPASS_SIZE = Math.min(width - 64, 320);
+const NEEDLE_LENGTH = COMPASS_SIZE * 0.38;
+
+// Cardinal directions with degrees
+const CARDINALS = [
+  { label: 'N', deg: 0 },
+  { label: 'NE', deg: 45 },
+  { label: 'E', deg: 90 },
+  { label: 'SE', deg: 135 },
+  { label: 'S', deg: 180 },
+  { label: 'SW', deg: 225 },
+  { label: 'W', deg: 270 },
+  { label: 'NW', deg: 315 },
+];
+
+// Generate degree tick marks
+const TICKS = Array.from({ length: 72 }, (_, i) => ({
+  deg: i * 5,
+  major: i % 6 === 0,
+  medium: i % 3 === 0 && i % 6 !== 0,
+}));
+
+function getCardinalLabel(deg: number): string {
+  const d = ((deg % 360) + 360) % 360;
+  if (d < 22.5 || d >= 337.5) return 'N';
+  if (d < 67.5) return 'NE';
+  if (d < 112.5) return 'E';
+  if (d < 157.5) return 'SE';
+  if (d < 202.5) return 'S';
+  if (d < 247.5) return 'SW';
+  if (d < 292.5) return 'W';
+  return 'NW';
+}
+
+function getAccuracyLevel(heading: number): { label: string; color: string; icon: string } {
+  // Simple heuristic — in real device this would use sensor accuracy
+  return { label: 'Good', color: '#52C98A', icon: 'check-circle' };
+}
 
 export default function QiblaScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors: C } = useApp();
   const { direction, distance, loading, error, coordinates, reload } = useQibla();
+
   const [compassHeading, setCompassHeading] = useState(0);
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const rotateAnimCompass = useRef(new Animated.Value(0)).current;
+  const [magnetometerAvailable, setMagnetometerAvailable] = useState<boolean | null>(null);
+  const [calibrating, setCalibrating] = useState(false);
+  const [sensorAccuracy, setSensorAccuracy] = useState<number>(3);
+
+  // Animated values
+  const compassRotAnim = useRef(new Animated.Value(0)).current;
+  const needleRotAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
+  // Pulse animation when pointing at Qibla
+  const startPulse = useCallback(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.08, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [pulseAnim]);
 
   useEffect(() => {
-    let sub: any;
+    startPulse();
+    let sub: ReturnType<typeof Magnetometer.addListener> | undefined;
+
     Magnetometer.isAvailableAsync().then(available => {
+      setMagnetometerAvailable(available);
       if (available) {
-        Magnetometer.setUpdateInterval(100);
+        Magnetometer.setUpdateInterval(80);
         sub = Magnetometer.addListener(data => {
+          // Calculate heading from magnetometer data
           let angle = Math.atan2(data.y, data.x) * (180 / Math.PI);
           if (angle < 0) angle += 360;
-          setCompassHeading(angle);
+          const smoothed = angle;
+          setCompassHeading(smoothed);
         });
       }
     });
+
     return () => sub?.remove();
   }, []);
 
+  // Animate compass rose and qibla needle
   useEffect(() => {
+    const compassTarget = -compassHeading;
+    const qiblaTarget = direction !== null ? direction - compassHeading : 0;
+
+    Animated.parallel([
+      Animated.spring(compassRotAnim, {
+        toValue: compassTarget,
+        useNativeDriver: true,
+        damping: 15,
+        stiffness: 120,
+        mass: 0.8,
+      }),
+      Animated.spring(needleRotAnim, {
+        toValue: qiblaTarget,
+        useNativeDriver: true,
+        damping: 15,
+        stiffness: 120,
+        mass: 0.8,
+      }),
+    ]).start();
+
+    // Glow when aligned with Qibla (within 5 degrees)
     if (direction !== null) {
-      const qiblaRotation = direction - compassHeading;
-      Animated.spring(rotateAnim, { toValue: qiblaRotation, useNativeDriver: true, damping: 10, stiffness: 100 }).start();
-      Animated.spring(rotateAnimCompass, { toValue: -compassHeading, useNativeDriver: true, damping: 10, stiffness: 100 }).start();
+      const diff = Math.abs(((qiblaTarget % 360) + 360) % 360);
+      const aligned = diff < 5 || diff > 355;
+      Animated.timing(glowAnim, { toValue: aligned ? 1 : 0, duration: 300, useNativeDriver: true }).start();
     }
   }, [direction, compassHeading]);
 
-  const needleRotation = rotateAnim.interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] });
-  const compassRotation = rotateAnimCompass.interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] });
+  const compassRotStr = compassRotAnim.interpolate({
+    inputRange: [-720, 720],
+    outputRange: ['-720deg', '720deg'],
+  });
+
+  const needleRotStr = needleRotAnim.interpolate({
+    inputRange: [-720, 720],
+    outputRange: ['-720deg', '720deg'],
+  });
 
   if (loading) {
     return (
       <View style={[styles.container, styles.center, { backgroundColor: C.background, paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={C.gold} />
-        <Text style={[styles.loadingText, { color: C.textSecondary }]}>Getting your location...</Text>
+        <Text style={[styles.statusText, { color: C.textSecondary }]}>Locating your position...</Text>
+        <Text style={[styles.statusSub, { color: C.textMuted }]}>Finding direction to the Holy Ka'bah</Text>
       </View>
     );
   }
 
+  const accuracy = getAccuracyLevel(compassHeading);
+  const qiblaAngle = direction !== null ? Math.round(direction) : null;
+  const headingAngle = Math.round(compassHeading);
+  const cardinal = getCardinalLabel(compassHeading);
+
   return (
     <View style={[styles.container, { backgroundColor: C.background, paddingTop: insets.top }]}>
-      <View style={[styles.header, { borderBottomColor: C.cardBorder }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <MaterialIcons name="arrow-back" size={24} color={C.textPrimary} />
-        </Pressable>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.headerTitle, { color: C.textPrimary }]}>Qibla Direction</Text>
-          <Text style={[styles.headerSub, { color: C.textMuted }]}>Direction towards Al-Ka'bah</Text>
+      {/* Header */}
+      <LinearGradient colors={[C.primaryDark, C.primary]} style={styles.header}>
+        <View style={styles.headerRow}>
+          <Pressable onPress={() => router.back()} style={styles.headerBtn}>
+            <MaterialIcons name="arrow-back" size={24} color={C.textPrimary} />
+          </Pressable>
+          <View style={styles.headerCenter}>
+            <Text style={[styles.headerTitle, { color: C.textPrimary }]}>Qibla Direction</Text>
+            <Text style={[styles.headerArabic, { color: C.gold }]}>القِبْلَة</Text>
+          </View>
+          <Pressable onPress={reload} style={[styles.headerBtn, { backgroundColor: `${C.gold}20` }]}>
+            <MaterialIcons name="my-location" size={22} color={C.gold} />
+          </Pressable>
         </View>
-        <Pressable onPress={reload} style={styles.refreshBtn}>
-          <MaterialIcons name="refresh" size={20} color={C.gold} />
-        </Pressable>
-      </View>
 
-      <View style={styles.compassArea}>
-        {error ? (
-          <View style={styles.errorArea}>
+        {/* Location info */}
+        {coordinates ? (
+          <View style={[styles.locationBar, { backgroundColor: `${C.gold}10`, borderColor: `${C.gold}20` }]}>
+            <MaterialIcons name="location-on" size={14} color={C.gold} />
+            <Text style={[styles.locationText, { color: C.textSecondary }]}>
+              {coordinates.lat.toFixed(4)}°N, {coordinates.lng.toFixed(4)}°E
+            </Text>
+            {distance !== null && (
+              <>
+                <View style={styles.locationDot} />
+                <MaterialIcons name="mosque" size={12} color={C.gold} />
+                <Text style={[styles.locationText, { color: C.gold }]}>
+                  {distance.toLocaleString()} km
+                </Text>
+              </>
+            )}
+          </View>
+        ) : null}
+      </LinearGradient>
+
+      {error ? (
+        <View style={[styles.errorState, { margin: Spacing.md }]}>
+          <View style={[styles.errorCard, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
             <MaterialIcons name="location-off" size={48} color={C.error} />
-            <Text style={[styles.errorText, { color: C.error }]}>{error}</Text>
-            <Pressable style={[styles.retryBtn, { backgroundColor: C.primary }]} onPress={reload}>
-              <Text style={[styles.retryText, { color: C.gold }]}>Enable Location</Text>
+            <Text style={[styles.errorTitle, { color: C.textPrimary }]}>Location Required</Text>
+            <Text style={[styles.errorDesc, { color: C.textSecondary }]}>
+              Enable location services to accurately determine your Qibla direction.
+            </Text>
+            <Pressable
+              style={[styles.errorBtn, { backgroundColor: C.gold }]}
+              onPress={reload}
+            >
+              <MaterialIcons name="location-on" size={18} color={C.primaryDark} />
+              <Text style={[styles.errorBtnText, { color: C.primaryDark }]}>Enable Location</Text>
             </Pressable>
           </View>
-        ) : (
-          <>
-            <Animated.View style={[styles.compassRose, { borderColor: `${C.gold}30`, backgroundColor: `${C.primary}10`, transform: [{ rotate: compassRotation }] }]}>
-              {['N', 'E', 'S', 'W'].map((dir, i) => (
-                <View key={dir} style={[styles.compassPoint, { transform: [{ rotate: `${i * 90}deg` }] }]}>
-                  <Text style={[styles.compassLetter, { color: C.textSecondary }, dir === 'N' && { color: C.gold, fontSize: 16 }]}>{dir}</Text>
-                </View>
+        </View>
+      ) : (
+        <View style={styles.compassSection}>
+          {/* Compass Container */}
+          <View style={[styles.compassOuter, { width: COMPASS_SIZE + 32, height: COMPASS_SIZE + 32 }]}>
+            {/* Outer ring glow */}
+            <Animated.View
+              style={[
+                styles.outerGlow,
+                {
+                  width: COMPASS_SIZE + 32,
+                  height: COMPASS_SIZE + 32,
+                  borderRadius: (COMPASS_SIZE + 32) / 2,
+                  borderColor: C.gold,
+                  opacity: glowAnim,
+                },
+              ]}
+            />
+
+            {/* Compass rose — rotates with device */}
+            <Animated.View
+              style={[
+                styles.compassRose,
+                {
+                  width: COMPASS_SIZE,
+                  height: COMPASS_SIZE,
+                  borderRadius: COMPASS_SIZE / 2,
+                  backgroundColor: C.card,
+                  borderColor: `${C.gold}30`,
+                  transform: [{ rotate: compassRotStr }],
+                },
+              ]}
+            >
+              {/* Degree ticks */}
+              {TICKS.map(tick => (
+                <View
+                  key={tick.deg}
+                  style={[
+                    styles.tick,
+                    {
+                      height: tick.major ? 16 : tick.medium ? 10 : 6,
+                      width: tick.major ? 2 : 1.5,
+                      backgroundColor: tick.major ? C.gold : tick.medium ? `${C.gold}60` : `${C.gold}30`,
+                      top: 8,
+                      left: COMPASS_SIZE / 2 - (tick.major ? 1 : 0.75),
+                      transform: [
+                        { rotate: `${tick.deg}deg` },
+                        { translateY: 0 },
+                      ],
+                      transformOrigin: `${tick.major ? 1 : 0.75}px ${COMPASS_SIZE / 2 - 8}px`,
+                    },
+                  ]}
+                />
               ))}
-              {Array.from({ length: 36 }).map((_, i) => (
-                <View key={i} style={[styles.degreeMark, { backgroundColor: `${C.gold}40`, transform: [{ rotate: `${i * 10}deg` }, { translateY: -110 }], height: i % 3 === 0 ? 10 : 5 }]} />
-              ))}
+
+              {/* Cardinal direction labels */}
+              {CARDINALS.map(({ label, deg }) => {
+                const radians = (deg - 90) * (Math.PI / 180);
+                const r = COMPASS_SIZE / 2 - 32;
+                const x = COMPASS_SIZE / 2 + r * Math.cos(radians) - 12;
+                const y = COMPASS_SIZE / 2 + r * Math.sin(radians) - 10;
+                return (
+                  <View key={label} style={[styles.cardinalLabel, { left: x, top: y }]}>
+                    <Text style={[
+                      styles.cardinalText,
+                      { color: label === 'N' ? C.gold : `${C.textSecondary}90` },
+                      label === 'N' && styles.cardinalNorth,
+                    ]}>
+                      {label}
+                    </Text>
+                  </View>
+                );
+              })}
+
+              {/* Center circle */}
+              <View style={[styles.compassCenter, { backgroundColor: C.background, borderColor: `${C.gold}40` }]} />
             </Animated.View>
 
-            <Animated.View style={[styles.needleContainer, { transform: [{ rotate: needleRotation }] }]}>
-              <View style={[styles.needleUp, { backgroundColor: C.gold }]} />
-              <View style={[styles.needleCenter, { backgroundColor: C.textPrimary, borderColor: C.gold }]} />
-              <View style={[styles.needleDown, { backgroundColor: C.textMuted }]} />
+            {/* Qibla Needle — rotates to point at Qibla */}
+            <Animated.View
+              style={[
+                styles.needleContainer,
+                {
+                  width: COMPASS_SIZE,
+                  height: COMPASS_SIZE,
+                  transform: [{ rotate: needleRotStr }],
+                },
+              ]}
+            >
+              {/* Needle up (toward Qibla) */}
+              <View style={[styles.needleUp, {
+                height: NEEDLE_LENGTH,
+                backgroundColor: C.gold,
+                top: COMPASS_SIZE / 2 - NEEDLE_LENGTH - 4,
+                left: COMPASS_SIZE / 2 - 4,
+              }]} />
+
+              {/* Needle tip */}
+              <View style={[styles.needleTip, {
+                backgroundColor: C.gold,
+                top: COMPASS_SIZE / 2 - NEEDLE_LENGTH - 12,
+                left: COMPASS_SIZE / 2 - 8,
+              }]} />
+
+              {/* Needle back */}
+              <View style={[styles.needleDown, {
+                height: NEEDLE_LENGTH * 0.4,
+                backgroundColor: `${C.gold}50`,
+                top: COMPASS_SIZE / 2 + 4,
+                left: COMPASS_SIZE / 2 - 3,
+              }]} />
             </Animated.View>
 
-            <View style={styles.kaabaIcon}>
-              <Text style={styles.kaabaEmoji}>🕋</Text>
-            </View>
-          </>
-        )}
-      </View>
+            {/* Kaaba icon at needle tip direction */}
+            <Animated.View
+              style={[
+                styles.kaabaContainer,
+                { transform: [{ rotate: needleRotStr }] },
+              ]}
+            >
+              <View style={[styles.kaabaWrapper, {
+                top: COMPASS_SIZE / 2 + 16 - COMPASS_SIZE / 2 - NEEDLE_LENGTH - 14,
+                left: COMPASS_SIZE / 2 + 16 - 16,
+              }]}>
+                <Text style={styles.kaabaEmoji}>🕋</Text>
+              </View>
+            </Animated.View>
 
-      <View style={styles.infoRow}>
-        {[
-          { label: 'Qibla Direction', value: direction !== null ? `${Math.round(direction)}°` : '--', sub: 'from North' },
-          { label: 'Distance', value: distance !== null ? `${distance.toLocaleString()}` : '--', sub: 'km to Kaaba' },
-          { label: 'Compass', value: `${Math.round(compassHeading)}°`, sub: 'current heading' },
-        ].map(({ label, value, sub }) => (
-          <View key={label} style={[styles.infoCard, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
-            <Text style={[styles.infoLabel, { color: C.textMuted }]}>{label}</Text>
-            <Text style={[styles.infoValue, { color: C.gold }]}>{value}</Text>
-            <Text style={[styles.infoSub, { color: C.textMuted }]}>{sub}</Text>
+            {/* Center pivot */}
+            <Animated.View
+              style={[
+                styles.pivot,
+                {
+                  backgroundColor: C.gold,
+                  borderColor: C.primaryDark,
+                  transform: [{ scale: pulseAnim }],
+                },
+              ]}
+            />
           </View>
-        ))}
-      </View>
 
-      {coordinates && (
-        <View style={styles.coordCard}>
-          <MaterialIcons name="location-on" size={14} color={C.textMuted} />
-          <Text style={[styles.coordText, { color: C.textMuted }]}>
-            {coordinates.lat.toFixed(4)}°N, {coordinates.lng.toFixed(4)}°E
+          {/* Heading display */}
+          <View style={[styles.headingDisplay, { backgroundColor: `${C.gold}15`, borderColor: `${C.gold}30` }]}>
+            <Text style={[styles.headingDeg, { color: C.gold }]}>{headingAngle}°</Text>
+            <Text style={[styles.headingCard, { color: C.textMuted }]}>{cardinal}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Info Cards */}
+      {!error && (
+        <View style={[styles.infoCards, { paddingHorizontal: Spacing.md }]}>
+          {[
+            {
+              icon: 'explore',
+              label: 'Qibla',
+              value: qiblaAngle !== null ? `${qiblaAngle}°` : '--',
+              sub: 'from North',
+              color: C.gold,
+            },
+            {
+              icon: 'mosque',
+              label: 'Distance',
+              value: distance !== null ? `${distance.toLocaleString()}` : '--',
+              sub: 'km to Ka\'bah',
+              color: C.success,
+            },
+            {
+              icon: 'navigation',
+              label: 'Heading',
+              value: `${headingAngle}°`,
+              sub: getCardinalLabel(compassHeading),
+              color: C.info,
+            },
+          ].map(card => (
+            <View
+              key={card.label}
+              style={[styles.infoCard, { backgroundColor: C.card, borderColor: C.cardBorder }]}
+            >
+              <View style={[styles.infoIconBox, { backgroundColor: `${card.color}15` }]}>
+                <MaterialIcons name={card.icon as any} size={18} color={card.color} />
+              </View>
+              <Text style={[styles.infoValue, { color: card.color }]}>{card.value}</Text>
+              <Text style={[styles.infoLabel, { color: C.textMuted }]}>{card.label}</Text>
+              <Text style={[styles.infoSub, { color: C.textMuted }]}>{card.sub}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Sensor status / Calibration note */}
+      {!error && (
+        <View style={[styles.statusBar, { marginHorizontal: Spacing.md, backgroundColor: `${C.info}10`, borderColor: `${C.info}20` }]}>
+          <MaterialIcons
+            name={magnetometerAvailable ? 'sensors' : 'sensors-off'}
+            size={14}
+            color={magnetometerAvailable ? C.info : C.warning}
+          />
+          <Text style={[styles.statusBarText, { color: C.textMuted }]}>
+            {magnetometerAvailable
+              ? 'Live compass active. Move in a figure-8 pattern to calibrate.'
+              : 'Magnetometer unavailable. Qibla direction calculated from GPS only.'}
           </Text>
         </View>
       )}
 
-      <View style={[styles.calibrateNote, { backgroundColor: `${C.info}10`, borderColor: `${C.info}20` }]}>
-        <MaterialIcons name="info-outline" size={14} color={C.textMuted} />
-        <Text style={[styles.calibrateText, { color: C.textMuted }]}>
-          Move device in figure-8 to calibrate compass. Keep away from metal objects.
-        </Text>
-      </View>
+      {/* Compass instruction */}
+      {!error && direction !== null && (
+        <View style={[styles.instructionCard, { marginHorizontal: Spacing.md, backgroundColor: `${C.gold}08`, borderColor: `${C.gold}20` }]}>
+          <Text style={styles.instructionEmoji}>🕋</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.instructionTitle, { color: C.textPrimary }]}>Face the Qibla</Text>
+            <Text style={[styles.instructionSub, { color: C.textSecondary }]}>
+              Align the golden needle with the Ka'bah icon pointing forward.
+              Hold device flat and away from metal objects.
+            </Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  center: { justifyContent: 'center', alignItems: 'center', gap: 12 },
-  loadingText: { fontSize: 15 },
-  header: {
+  center: { justifyContent: 'center', alignItems: 'center', gap: 16 },
+  statusText: { fontSize: 16, fontWeight: '600' },
+  statusSub: { fontSize: 13 },
+
+  header: { paddingHorizontal: Spacing.md, paddingBottom: Spacing.md },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
+    gap: Spacing.sm,
+    paddingTop: Spacing.sm,
+    marginBottom: Spacing.sm,
   },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  headerCenter: { flex: 1 },
   headerTitle: { fontSize: 20, fontWeight: '700' },
-  headerSub: { fontSize: 13 },
-  refreshBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  compassArea: { height: 280, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.xl },
-  errorArea: { alignItems: 'center', gap: 12 },
-  errorText: { fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
-  retryBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: Radius.md },
-  retryText: { fontWeight: '600' },
+  headerArabic: { fontSize: 16, marginTop: 2 },
+  locationBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: 8,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  locationText: { fontSize: 12 },
+  locationDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#666' },
+
+  compassSection: { alignItems: 'center', paddingTop: Spacing.lg },
+  compassOuter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  outerGlow: {
+    position: 'absolute',
+    borderWidth: 2,
+    ...Shadow.gold,
+  },
   compassRose: {
     position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    borderWidth: 2,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+    ...Shadow.medium,
+  },
+  tick: {
+    position: 'absolute',
+    borderRadius: 1,
+  },
+  cardinalLabel: {
+    position: 'absolute',
+    width: 24,
+    height: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  compassPoint: { position: 'absolute', top: 8, alignItems: 'center', width: 30 },
-  compassLetter: { fontSize: 14, fontWeight: '700' },
-  degreeMark: { position: 'absolute', top: 0, width: 2, borderRadius: 1 },
-  needleContainer: { position: 'absolute', alignItems: 'center', height: 200, justifyContent: 'center' },
-  needleUp: { width: 6, height: 80, borderTopLeftRadius: 3, borderTopRightRadius: 3 },
-  needleCenter: { width: 16, height: 16, borderRadius: 8, borderWidth: 2 },
-  needleDown: { width: 6, height: 60, borderBottomLeftRadius: 3, borderBottomRightRadius: 3 },
-  kaabaIcon: { position: 'absolute', top: -20, width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  kaabaEmoji: { fontSize: 28 },
-  infoRow: { flexDirection: 'row', gap: 12, paddingHorizontal: Spacing.md, marginTop: Spacing.xl },
-  infoCard: { flex: 1, borderRadius: Radius.md, padding: Spacing.md, alignItems: 'center', borderWidth: 1 },
-  infoLabel: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 },
-  infoValue: { fontSize: 22, fontWeight: '700', marginTop: 4 },
-  infoSub: { fontSize: 11, marginTop: 2 },
-  coordCard: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: Spacing.md, marginTop: Spacing.md },
-  coordText: { fontSize: 12 },
-  calibrateNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, margin: Spacing.md, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1 },
-  calibrateText: { flex: 1, fontSize: 12, lineHeight: 18 },
+  cardinalText: { fontSize: 11, fontWeight: '600' },
+  cardinalNorth: { fontSize: 14, fontWeight: '800' },
+  compassCenter: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    top: '50%',
+    left: '50%',
+    marginTop: -12,
+    marginLeft: -12,
+  },
+
+  needleContainer: {
+    position: 'absolute',
+  },
+  needleUp: {
+    position: 'absolute',
+    width: 8,
+    borderRadius: 4,
+  },
+  needleTip: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    ...Shadow.gold,
+  },
+  needleDown: {
+    position: 'absolute',
+    width: 6,
+    borderRadius: 3,
+    opacity: 0.5,
+  },
+
+  kaabaContainer: {
+    position: 'absolute',
+    width: COMPASS_SIZE + 32,
+    height: COMPASS_SIZE + 32,
+  },
+  kaabaWrapper: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kaabaEmoji: { fontSize: 22 },
+
+  pivot: {
+    position: 'absolute',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 3,
+    ...Shadow.gold,
+  },
+
+  headingDisplay: {
+    marginTop: Spacing.lg,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: Radius.round,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headingDeg: { fontSize: 20, fontWeight: '700' },
+  headingCard: { fontSize: 14, fontWeight: '600' },
+
+  errorState: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorCard: {
+    padding: Spacing.xl,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: Spacing.md,
+    maxWidth: 320,
+  },
+  errorTitle: { fontSize: 18, fontWeight: '700' },
+  errorDesc: { fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  errorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 12,
+    borderRadius: Radius.md,
+    marginTop: 4,
+  },
+  errorBtnText: { fontSize: 15, fontWeight: '700' },
+
+  infoCards: { flexDirection: 'row', gap: 10, marginTop: Spacing.lg },
+  infoCard: {
+    flex: 1,
+    borderRadius: Radius.lg,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    gap: 4,
+  },
+  infoIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  infoValue: { fontSize: 18, fontWeight: '700', marginTop: 2 },
+  infoLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  infoSub: { fontSize: 10 },
+
+  statusBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    marginTop: Spacing.md,
+  },
+  statusBarText: { flex: 1, fontSize: 12, lineHeight: 18 },
+
+  instructionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    marginTop: Spacing.sm,
+  },
+  instructionEmoji: { fontSize: 32 },
+  instructionTitle: { fontSize: 15, fontWeight: '700' },
+  instructionSub: { fontSize: 12, lineHeight: 18, marginTop: 3 },
 });

@@ -38,6 +38,7 @@ const QUICK_ACTIONS = [
   { id: 'ramadan', title: 'Ramadan', subtitle: 'Companion', icon: 'nightlight', color: '#1B4D8A', route: '/ramadan' },
   { id: 'hajj', title: 'Hajj', subtitle: 'Guide', icon: 'flight-takeoff', color: '#4A2D6B', route: '/hajj-guide' },
   { id: 'stats', title: 'Statistics', subtitle: 'Progress', icon: 'bar-chart', color: '#2D6B4A', route: '/reading-stats' },
+  { id: 'audio', title: 'Audio', subtitle: 'Downloads', icon: 'headphones', color: '#6B2D5B', route: '/audio-manager' },
 ];
 
 const FEATURE_CARDS = [
