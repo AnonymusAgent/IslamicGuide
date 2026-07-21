@@ -13,6 +13,7 @@ import { useApp } from '../../contexts/AppContext';
 import { SURAH_LIST, RECITERS, TRANSLATIONS } from '../../constants/quranData';
 import { Audio } from 'expo-av';
 import { getAudioUrl, fetchWordByWord } from '../../services/quranService';
+import { useLocalSearchParams as _useParams } from 'expo-router';
 
 // Tajweed color rules (simplified visual highlights)
 const TAJWEED_PATTERNS = [
@@ -276,6 +277,14 @@ export default function SurahScreen() {
             <Pressable style={styles.ayahActionBtn} onPress={() => setLastRead({ surahNumber: surahNum, ayahNumber: ayahNum })}>
               <MaterialIcons name="flag" size={18} color={C.textMuted} />
               <Text style={[styles.ayahActionText, { color: C.textMuted }]}>Mark</Text>
+            </Pressable>
+            <Pressable style={styles.ayahActionBtn} onPress={() => router.push(`/tafsir/${surahNum}` as any)}>
+              <MaterialIcons name="menu-book" size={18} color={C.textMuted} />
+              <Text style={[styles.ayahActionText, { color: C.textMuted }]}>Tafsir</Text>
+            </Pressable>
+            <Pressable style={styles.ayahActionBtn} onPress={() => router.push({ pathname: '/quran-comparison', params: { surah: String(surahNum) } } as any)}>
+              <MaterialIcons name="compare-arrows" size={18} color={C.textMuted} />
+              <Text style={[styles.ayahActionText, { color: C.textMuted }]}>Compare</Text>
             </Pressable>
           </View>
         )}

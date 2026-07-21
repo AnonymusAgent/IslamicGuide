@@ -44,6 +44,9 @@ export default function MoreScreen() {
         { id: 'stats', title: 'Reading Statistics', subtitle: 'Quran progress, achievements & streaks', icon: 'bar-chart', color: '#2D6B4A', route: '/reading-stats' },
         { id: 'search', title: 'Global Search', subtitle: 'Search Quran, Hadith & Duas', icon: 'search', color: '#2D6B6B', route: '/search' },
         { id: 'audio', title: 'Audio Library', subtitle: 'Download & manage offline recitations', icon: 'headphones', color: '#6B2D5B', route: '/audio-manager' },
+        { id: 'hifz', title: 'Hifz Manager', subtitle: 'Quran memorization tracker & test mode', icon: 'psychology', color: '#2D4A2D', route: '/hifz' },
+        { id: 'comparison', title: 'Quran Comparison', subtitle: 'View 2-3 translations side-by-side', icon: 'compare-arrows', color: '#6B4A2D', route: '/quran-comparison' },
+        { id: 'mosque-finder', title: 'Mosque Finder', subtitle: 'Find nearby mosques with GPS', icon: 'location-on', color: '#2D6B2D', route: '/mosque-finder' },
       ],
     },
     {

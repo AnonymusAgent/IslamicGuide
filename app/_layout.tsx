@@ -29,6 +29,10 @@ function AppContent() {
         <Stack.Screen name="reading-stats" options={{ headerShown: false }} />
         <Stack.Screen name="hajj-guide" options={{ headerShown: false }} />
         <Stack.Screen name="audio-manager" options={{ headerShown: false }} />
+        <Stack.Screen name="tafsir/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="mosque-finder" options={{ headerShown: false }} />
+        <Stack.Screen name="quran-comparison" options={{ headerShown: false }} />
+        <Stack.Screen name="hifz" options={{ headerShown: false }} />
       </Stack>
     </>
   );

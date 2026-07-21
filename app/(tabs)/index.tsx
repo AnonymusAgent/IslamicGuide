@@ -39,6 +39,9 @@ const QUICK_ACTIONS = [
   { id: 'hajj', title: 'Hajj', subtitle: 'Guide', icon: 'flight-takeoff', color: '#4A2D6B', route: '/hajj-guide' },
   { id: 'stats', title: 'Statistics', subtitle: 'Progress', icon: 'bar-chart', color: '#2D6B4A', route: '/reading-stats' },
   { id: 'audio', title: 'Audio', subtitle: 'Downloads', icon: 'headphones', color: '#6B2D5B', route: '/audio-manager' },
+  { id: 'hifz', title: 'Hifz', subtitle: 'Memorize', icon: 'psychology', color: '#2D4A2D', route: '/hifz' },
+  { id: 'compare', title: 'Compare', subtitle: 'Translations', icon: 'compare-arrows', color: '#6B4A2D', route: '/quran-comparison' },
+  { id: 'mosque', title: 'Mosques', subtitle: 'Near Me', icon: 'location-on', color: '#2D6B2D', route: '/mosque-finder' },
 ];
 
 const FEATURE_CARDS = [
