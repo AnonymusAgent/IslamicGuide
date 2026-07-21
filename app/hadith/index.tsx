@@ -3,8 +3,10 @@ import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Spacing, Radius } from '../../constants/theme';
 import { HADITH_COLLECTIONS } from '../../constants/hadithData';
+import { getOfflineHadithCount } from '../../constants/offlineHadithDb';
 import { useApp } from '../../contexts/AppContext';
 
 export default function HadithIndexScreen() {
@@ -14,47 +16,61 @@ export default function HadithIndexScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: C.background, paddingTop: insets.top }]}>
-      <View style={[styles.header, { borderBottomColor: C.cardBorder }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <MaterialIcons name="arrow-back" size={24} color={C.textPrimary} />
-        </Pressable>
-        <View>
-          <Text style={[styles.headerTitle, { color: C.textPrimary }]}>Hadith Collections</Text>
-          <Text style={[styles.headerSub, { color: C.textMuted }]}>Authentic Prophetic Traditions</Text>
+      <LinearGradient colors={[C.primaryDark, C.primary]} style={styles.header}>
+        <View style={styles.headerRow}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <MaterialIcons name="arrow-back" size={24} color={C.textPrimary} />
+          </Pressable>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.headerTitle, { color: C.textPrimary }]}>Hadith Collections</Text>
+            <Text style={[styles.headerSub, { color: C.textSecondary }]}>Authentic Prophetic Traditions</Text>
+          </View>
         </View>
-      </View>
+        <View style={[styles.offlineBadge, { backgroundColor: `${C.success}20`, borderColor: `${C.success}30` }]}>
+          <MaterialIcons name="offline-bolt" size={13} color={C.success} />
+          <Text style={[styles.offlineBadgeText, { color: C.success }]}>
+            All collections available offline — no internet required
+          </Text>
+        </View>
+      </LinearGradient>
 
       <FlatList
         data={HADITH_COLLECTIONS}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <Pressable
-            style={({ pressed }) => [styles.card, { backgroundColor: C.card, borderColor: C.cardBorder }, pressed && { opacity: 0.8 }]}
-            onPress={() => router.push(`/hadith/${item.id}` as any)}
-          >
-            <View style={[styles.cardIcon, { backgroundColor: `${item.color}20` }]}>
-              <Text style={styles.cardEmoji}>{item.icon}</Text>
-            </View>
-            <View style={styles.cardInfo}>
-              <Text style={[styles.cardTitle, { color: C.textPrimary }]}>{item.name}</Text>
-              <Text style={[styles.cardArabic, { color: C.textArabic }]}>{item.arabicName}</Text>
-              <Text style={[styles.cardScholar, { color: C.textMuted }]}>{item.scholar}</Text>
-              <View style={styles.cardMeta}>
-                <View style={[styles.badge, { backgroundColor: `${C.gold}20`, borderColor: `${C.gold}30` }]}>
-                  <Text style={[styles.badgeText, { color: C.gold }]}>{item.totalHadiths.toLocaleString()} hadiths</Text>
+        renderItem={({ item }) => {
+          const offlineCount = getOfflineHadithCount(item.id);
+          return (
+            <Pressable
+              style={({ pressed }) => [styles.card, { backgroundColor: C.card, borderColor: C.cardBorder }, pressed && { opacity: 0.8 }]}
+              onPress={() => router.push(`/hadith/${item.id}` as any)}
+            >
+              <View style={[styles.cardIcon, { backgroundColor: `${item.color}20` }]}>
+                <Text style={styles.cardEmoji}>{item.icon}</Text>
+              </View>
+              <View style={styles.cardInfo}>
+                <Text style={[styles.cardTitle, { color: C.textPrimary }]}>{item.name}</Text>
+                <Text style={[styles.cardArabic, { color: C.textArabic }]}>{item.arabicName}</Text>
+                <Text style={[styles.cardScholar, { color: C.textMuted }]}>{item.scholar}</Text>
+                <View style={styles.cardMeta}>
+                  <View style={[styles.badge, { backgroundColor: `${C.gold}20`, borderColor: `${C.gold}30` }]}>
+                    <MaterialIcons name="offline-bolt" size={10} color={C.gold} />
+                    <Text style={[styles.badgeText, { color: C.gold }]}>
+                      {offlineCount > 0 ? `${offlineCount} available offline` : 'Core hadiths available'}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-            <MaterialIcons name="chevron-right" size={20} color={C.textMuted} />
-          </Pressable>
-        )}
+              <MaterialIcons name="chevron-right" size={20} color={C.textMuted} />
+            </Pressable>
+          );
+        }}
         ListHeaderComponent={
-          <View style={[styles.intro, { backgroundColor: `${C.primary}30`, borderColor: `${C.primary}50` }]}>
+          <View style={[styles.intro, { backgroundColor: `${C.primary}20`, borderColor: `${C.primary}40` }]}>
             <Text style={[styles.introText, { color: C.textSecondary }]}>
-              The six authentic hadith collections (Kutub al-Sittah) form the basis of Islamic jurisprudence.
-              All hadiths are sourced from authenticated Islamic databases.
+              The six authentic hadith collections (Kutub al-Sittah) plus Riyad as-Salihin and Nawawi's 40 Hadiths.
+              All core hadiths are stored offline — verified, complete, and accessible without internet.
             </Text>
           </View>
         }
@@ -66,16 +82,28 @@ export default function HadithIndexScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+  },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
+    paddingTop: 4,
+    marginBottom: Spacing.sm,
   },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 20, fontWeight: '700' },
-  headerSub: { fontSize: 13 },
+  headerSub: { fontSize: 13, marginTop: 2 },
+  offlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  offlineBadgeText: { fontSize: 12, fontWeight: '600' },
   intro: {
     margin: Spacing.md,
     padding: Spacing.md,
@@ -83,7 +111,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   introText: { fontSize: 13, lineHeight: 20 },
-  list: { paddingBottom: 100 },
+  list: { paddingBottom: 120 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -102,6 +130,9 @@ const styles = StyleSheet.create({
   cardScholar: { fontSize: 12, marginTop: 2 },
   cardMeta: { flexDirection: 'row', gap: 8, marginTop: 6 },
   badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 10,

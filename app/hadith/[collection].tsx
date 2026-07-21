@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Pressable,
   ActivityIndicator, Share,
@@ -6,117 +6,197 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, Radius } from '../../constants/theme';
-import { HADITH_COLLECTIONS, SAMPLE_HADITHS } from '../../constants/hadithData';
-import { useHadithCollection } from '../../hooks/useHadith';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Spacing, Radius } from '../../constants/theme';
+import { HADITH_COLLECTIONS } from '../../constants/hadithData';
+import { getOfflineHadiths, OfflineHadith } from '../../constants/offlineHadithDb';
 import { useApp } from '../../contexts/AppContext';
 
 export default function HadithCollectionScreen() {
   const { collection } = useLocalSearchParams<{ collection: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { addBookmark, removeBookmark, isBookmarked } = useApp();
+  const { addBookmark, removeBookmark, isBookmarked, colors: C } = useApp();
 
   const meta = HADITH_COLLECTIONS.find(c => c.id === collection);
-  const { hadiths, loading, error, loadHadiths, loadMore } = useHadithCollection(collection || 'bukhari');
 
-  useEffect(() => { loadHadiths(1); }, []);
+  // Load from offline DB — always available, no network needed
+  const [hadiths] = useState<OfflineHadith[]>(() =>
+    getOfflineHadiths(collection || 'nawawi40')
+  );
 
-  const shareHadith = async (item: any) => {
-    const text = `${item.arab || ''}\n\n"${item.id}"\n\n— ${meta?.name} #${item.number}`;
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const shareHadith = useCallback(async (item: OfflineHadith) => {
+    const text = `${item.arabic}\n\n"${item.english}"\n\n— ${item.narrator}\n${item.reference}`;
     await Share.share({ message: text });
-  };
+  }, []);
 
-  const renderHadith = ({ item }: { item: any }) => {
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedId(prev => prev === id ? null : id);
+  }, []);
+
+  const renderHadith = useCallback(({ item }: { item: OfflineHadith }) => {
     const ref = `hadith_${collection}_${item.number}`;
     const bookmarked = isBookmarked(ref);
-    return (
-      <View style={styles.hadithCard}>
-        <View style={styles.hadithTop}>
-          <View style={styles.hadithNum}>
-            <Text style={styles.hadithNumText}>{item.number}</Text>
-          </View>
-          <View style={styles.hadithMeta}>
-            <Text style={styles.hadithBook}>{meta?.name}</Text>
-            <View style={styles.gradeBadge}>
-              <Text style={styles.gradeText}>Hadith #{item.number}</Text>
-            </View>
-          </View>
-          <View style={styles.hadithActions}>
-            <Pressable onPress={() => shareHadith(item)} style={styles.actionIcon}>
-              <MaterialIcons name="share" size={18} color={Colors.textMuted} />
-            </Pressable>
-            <Pressable
-              onPress={() => bookmarked
-                ? removeBookmark(ref)
-                : addBookmark({ type: 'hadith', reference: ref, title: `${meta?.name} #${item.number}`, subtitle: String(item.id).substring(0, 60) + '...' })}
-              style={styles.actionIcon}
-            >
-              <MaterialIcons name={bookmarked ? 'bookmark' : 'bookmark-border'} size={18} color={bookmarked ? Colors.gold : Colors.textMuted} />
-            </Pressable>
-          </View>
-        </View>
+    const isExpanded = expandedId === item.id;
 
-        {item.arab ? (
-          <Text style={styles.arabicText}>{item.arab}</Text>
+    const gradeColor = item.grade === 'Sahih'
+      ? C.success
+      : item.grade === 'Hasan' || item.grade === 'Hasan Sahih'
+      ? C.gold
+      : C.textMuted;
+
+    return (
+      <View style={[styles.card, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
+        {/* Header Row */}
+        <Pressable style={styles.cardHeader} onPress={() => toggleExpand(item.id)}>
+          <View style={[styles.numBox, { backgroundColor: `${C.gold}15`, borderColor: `${C.gold}30` }]}>
+            <Text style={[styles.numText, { color: C.gold }]}>{item.number}</Text>
+          </View>
+          <View style={styles.cardMeta}>
+            <Text style={[styles.chapterName, { color: C.textPrimary }]} numberOfLines={isExpanded ? undefined : 1}>
+              {item.chapterName}
+            </Text>
+            <Text style={[styles.bookName, { color: C.textMuted }]}>{item.bookName}</Text>
+          </View>
+          <View style={styles.cardHeaderRight}>
+            <View style={[styles.gradeBadge, { backgroundColor: `${gradeColor}15` }]}>
+              <Text style={[styles.gradeText, { color: gradeColor }]}>{item.grade}</Text>
+            </View>
+            <MaterialIcons
+              name={isExpanded ? 'expand-less' : 'expand-more'}
+              size={20}
+              color={C.textMuted}
+            />
+          </View>
+        </Pressable>
+
+        {/* Arabic Text */}
+        {item.arabic ? (
+          <Text style={[styles.arabicText, { color: C.textArabic, fontSize: 20 }]}>
+            {item.arabic}
+          </Text>
         ) : null}
 
-        <Text style={styles.hadithText}>{item.id}</Text>
+        {/* English Translation */}
+        <Text style={[styles.englishText, { color: C.textPrimary }]}>
+          {item.english}
+        </Text>
 
-        <View style={styles.refRow}>
-          <MaterialIcons name="info-outline" size={12} color={Colors.textMuted} />
-          <Text style={styles.refText}>{meta?.name}, Hadith {item.number}</Text>
+        {/* Expanded Details */}
+        {isExpanded && (
+          <View style={[styles.expandedDetails, { borderTopColor: C.divider }]}>
+            <View style={styles.detailRow}>
+              <MaterialIcons name="person" size={14} color={C.textMuted} />
+              <Text style={[styles.detailText, { color: C.textMuted }]}>
+                Narrator: {item.narrator}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <MaterialIcons name="info-outline" size={14} color={C.textMuted} />
+              <Text style={[styles.detailText, { color: C.textMuted }]}>
+                {item.reference}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Action Row */}
+        <View style={[styles.actionRow, { borderTopColor: C.divider }]}>
+          <Pressable
+            style={styles.actionBtn}
+            onPress={() => bookmarked
+              ? removeBookmark(ref)
+              : addBookmark({
+                  type: 'hadith',
+                  reference: ref,
+                  title: `${meta?.name} #${item.number}`,
+                  subtitle: item.english.substring(0, 80) + '...',
+                  arabic: item.arabic,
+                })}
+          >
+            <MaterialIcons
+              name={bookmarked ? 'bookmark' : 'bookmark-border'}
+              size={18}
+              color={bookmarked ? C.gold : C.textMuted}
+            />
+            <Text style={[styles.actionText, { color: C.textMuted }]}>
+              {bookmarked ? 'Saved' : 'Bookmark'}
+            </Text>
+          </Pressable>
+          <Pressable style={styles.actionBtn} onPress={() => shareHadith(item)}>
+            <MaterialIcons name="share" size={18} color={C.textMuted} />
+            <Text style={[styles.actionText, { color: C.textMuted }]}>Share</Text>
+          </Pressable>
+          <Pressable style={styles.actionBtn} onPress={() => toggleExpand(item.id)}>
+            <MaterialIcons name="info" size={18} color={C.textMuted} />
+            <Text style={[styles.actionText, { color: C.textMuted }]}>
+              {isExpanded ? 'Less' : 'Details'}
+            </Text>
+          </Pressable>
         </View>
       </View>
     );
-  };
-
-  // Use sample hadiths as fallback
-  const displayHadiths = hadiths.length > 0 ? hadiths : (
-    collection === 'nawawi40' || collection === 'bukhari' || collection === 'muslim'
-      ? SAMPLE_HADITHS.filter(h => h.collection === collection).map(h => ({
-          number: h.hadithNumber,
-          arab: h.arabic,
-          id: h.english,
-        }))
-      : []
-  );
+  }, [C, expandedId, collection, isBookmarked]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <MaterialIcons name="arrow-back" size={24} color={Colors.textPrimary} />
-        </Pressable>
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle}>{meta?.name || collection}</Text>
-          <Text style={styles.headerArabic}>{meta?.arabicName}</Text>
-        </View>
-      </View>
-
-      {loading && displayHadiths.length === 0 ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.gold} />
-          <Text style={styles.loadingText}>Loading hadiths...</Text>
-        </View>
-      ) : error && displayHadiths.length === 0 ? (
-        <View style={styles.center}>
-          <MaterialIcons name="error-outline" size={48} color={Colors.error} />
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retryBtn} onPress={() => loadHadiths(1)}>
-            <Text style={styles.retryText}>Retry</Text>
+    <View style={[styles.container, { backgroundColor: C.background, paddingTop: insets.top }]}>
+      {/* Header */}
+      <LinearGradient colors={[C.primaryDark, C.primary]} style={styles.header}>
+        <View style={styles.headerRow}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <MaterialIcons name="arrow-back" size={24} color={C.textPrimary} />
           </Pressable>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.headerTitle, { color: C.textPrimary }]}>
+              {meta?.name || collection}
+            </Text>
+            <Text style={[styles.headerArabic, { color: C.gold }]}>{meta?.arabicName}</Text>
+          </View>
+          <View style={[styles.countBadge, { backgroundColor: `${C.gold}20` }]}>
+            <Text style={[styles.countText, { color: C.gold }]}>{hadiths.length}</Text>
+            <Text style={[styles.countLabel, { color: C.textMuted }]}>hadiths</Text>
+          </View>
+        </View>
+
+        {/* Scholar Info */}
+        {meta && (
+          <View style={[styles.scholarCard, { backgroundColor: `${C.gold}10`, borderColor: `${C.gold}20` }]}>
+            <MaterialIcons name="person" size={14} color={C.gold} />
+            <Text style={[styles.scholarText, { color: C.textSecondary }]} numberOfLines={2}>
+              {meta.scholar}
+            </Text>
+          </View>
+        )}
+      </LinearGradient>
+
+      {hadiths.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="library-books" size={56} color={C.textMuted} />
+          <Text style={[styles.emptyTitle, { color: C.textPrimary }]}>
+            Collection Coming Soon
+          </Text>
+          <Text style={[styles.emptyDesc, { color: C.textMuted }]}>
+            This collection is being added to the offline database. Currently showing Nawawi 40 and selected hadiths from major collections.
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={displayHadiths}
+          data={hadiths}
           renderItem={renderHadith}
-          keyExtractor={(item, idx) => `${item.number || idx}`}
-          contentContainerStyle={styles.list}
+          keyExtractor={item => item.id}
+          contentContainerStyle={[styles.list, { paddingBottom: 120 }]}
           showsVerticalScrollIndicator={false}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={loading ? <ActivityIndicator color={Colors.gold} style={{ padding: 20 }} /> : null}
+          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          ListHeaderComponent={
+            <View style={[styles.offlineBanner, { backgroundColor: `${C.success}10`, borderColor: `${C.success}20` }]}>
+              <MaterialIcons name="offline-bolt" size={14} color={C.success} />
+              <Text style={[styles.offlineBannerText, { color: C.success }]}>
+                {hadiths.length} verified hadiths available offline
+              </Text>
+            </View>
+          }
         />
       )}
     </View>
@@ -124,87 +204,117 @@ export default function HadithCollectionScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  loadingText: { color: Colors.textSecondary, fontSize: 15 },
-  errorText: { color: Colors.error, fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
-  retryBtn: { backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 10, borderRadius: Radius.md },
-  retryText: { color: Colors.gold, fontWeight: '600' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
-  },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerInfo: {},
-  headerTitle: { fontSize: 18, color: Colors.textPrimary, fontWeight: '700' },
-  headerArabic: { fontSize: 16, color: Colors.gold },
-  list: { padding: Spacing.md, paddingBottom: 100, gap: 12 },
-  hadithCard: {
-    backgroundColor: Colors.card,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-  },
-  hadithTop: {
+  container: { flex: 1 },
+  header: { paddingHorizontal: Spacing.md, paddingBottom: Spacing.md },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+    paddingTop: 4,
     marginBottom: Spacing.sm,
   },
-  hadithNum: {
+  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '700' },
+  headerArabic: { fontSize: 16, marginTop: 2 },
+  countBadge: { alignItems: 'center', padding: 10, borderRadius: Radius.md },
+  countText: { fontSize: 18, fontWeight: '800' },
+  countLabel: { fontSize: 10, marginTop: 1 },
+  scholarCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  scholarText: { flex: 1, fontSize: 12, lineHeight: 18 },
+
+  list: { padding: Spacing.md },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  offlineBannerText: { fontSize: 12, fontWeight: '600' },
+
+  card: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    gap: 10,
+  },
+  numBox: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: `${Colors.gold}15`,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: `${Colors.gold}30`,
+    flexShrink: 0,
   },
-  hadithNumText: { fontSize: 12, color: Colors.gold, fontWeight: '700' },
-  hadithMeta: { flex: 1 },
-  hadithBook: { fontSize: 12, color: Colors.textMuted, fontWeight: '500' },
-  gradeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: `${Colors.success}20`,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-    marginTop: 2,
-  },
-  gradeText: { fontSize: 10, color: Colors.success, fontWeight: '600' },
-  hadithActions: { flexDirection: 'row', gap: 4 },
-  actionIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  numText: { fontSize: 12, fontWeight: '700' },
+  cardMeta: { flex: 1 },
+  chapterName: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  bookName: { fontSize: 11, marginTop: 2 },
+  cardHeaderRight: { alignItems: 'flex-end', gap: 4 },
+  gradeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  gradeText: { fontSize: 10, fontWeight: '700' },
+
   arabicText: {
-    fontSize: 20,
-    color: Colors.textArabic,
     textAlign: 'right',
-    lineHeight: 36,
-    marginBottom: Spacing.sm,
+    lineHeight: 40,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
     writingDirection: 'rtl',
   },
-  hadithText: {
+  englishText: {
     fontSize: 15,
-    color: Colors.textPrimary,
-    lineHeight: 24,
+    lineHeight: 26,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
     fontStyle: 'italic',
   },
-  refRow: {
+
+  expandedDetails: {
+    borderTopWidth: 1,
+    padding: 12,
+    gap: 8,
+  },
+  detailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  detailText: { fontSize: 12, lineHeight: 18, flex: 1 },
+
+  actionRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    padding: 8,
+    gap: 4,
+  },
+  actionBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.cardBorder,
+    paddingVertical: 6,
   },
-  refText: { fontSize: 11, color: Colors.textMuted },
+  actionText: { fontSize: 12 },
+
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+    gap: 12,
+  },
+  emptyTitle: { fontSize: 18, fontWeight: '700' },
+  emptyDesc: { fontSize: 14, textAlign: 'center', lineHeight: 22 },
 });

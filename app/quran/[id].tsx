@@ -10,9 +10,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Spacing, Radius } from '../../constants/theme';
 import { useSurah } from '../../hooks/useQuran';
 import { useApp } from '../../contexts/AppContext';
+import { useAudioPlayer } from '../../contexts/AudioPlayerContext';
 import { SURAH_LIST, RECITERS, TRANSLATIONS } from '../../constants/quranData';
 import { Audio } from 'expo-av';
-import { getAudioUrl, fetchWordByWord } from '../../services/quranService';
+import { fetchWordByWord } from '../../services/quranService';
 import { useLocalSearchParams as _useParams } from 'expo-router';
 
 // Tajweed color rules (simplified visual highlights)
@@ -39,16 +40,19 @@ export default function SurahScreen() {
   const surahMeta = SURAH_LIST[surahNum - 1];
 
   const { settings, updateSettings, addBookmark, removeBookmark, isBookmarked, setLastRead, updateReadingProgress, colors: C } = useApp();
+  const { playSurah, isPlaying: globalIsPlaying, nowPlaying, togglePlayPause } = useAudioPlayer();
   const { data, loading, error, reload } = useSurah(surahNum, settings.selectedTranslation);
 
   const [showSettings, setShowSettings] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [audioLoading, setAudioLoading] = useState(false);
   const [currentAyah, setCurrentAyah] = useState<number | null>(null);
   const [selectedAyah, setSelectedAyah] = useState<number | null>(null);
   const [wordByWordData, setWordByWordData] = useState<Record<number, WordData[]>>({});
   const [loadingWBW, setLoadingWBW] = useState<number | null>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+
+  // Derived: is this surah playing via the global player?
+  const isThisSurahPlaying = globalIsPlaying && nowPlaying?.surahNumber === surahNum;
+  const isPlaying = isThisSurahPlaying;
+  const audioLoading = false; // Global player handles loading state
 
   const totalAyahs = data?.arabic?.ayahs?.length || surahMeta?.versesCount || 1;
   const progress = settings.readingProgress?.[surahNum] || 0;
@@ -83,49 +87,10 @@ export default function SurahScreen() {
   };
 
   const playAudio = async () => {
-    try {
-      if (isPlaying) {
-        await soundRef.current?.pauseAsync();
-        setIsPlaying(false);
-        return;
-      }
-
-      setAudioLoading(true);
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-      }
-
-      const reciter = RECITERS.find(r => r.id === settings.selectedReciter) || RECITERS[0];
-      const audioUrl = getAudioUrl(surahNum, reciter.identifier);
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
-      });
-
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
-        { shouldPlay: true },
-        (status) => {
-          if (status.isLoaded && status.didJustFinish) {
-            setIsPlaying(false);
-            setCurrentAyah(null);
-            if (settings.autoPlayNext && surahNum < 114) {
-              router.push(`/quran/${surahNum + 1}` as any);
-            }
-          }
-        }
-      );
-
-      soundRef.current = sound;
-      setIsPlaying(true);
-      setAudioLoading(false);
-    } catch {
-      setAudioLoading(false);
-      setIsPlaying(false);
+    if (isThisSurahPlaying) {
+      await togglePlayPause();
+    } else {
+      await playSurah(surahNum, settings.selectedReciter);
     }
   };
 

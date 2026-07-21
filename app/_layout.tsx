@@ -2,6 +2,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from '../contexts/AppContext';
+import { AudioPlayerProvider } from '../contexts/AudioPlayerContext';
+import FloatingPlayer from '../components/FloatingPlayer';
 
 function AppContent() {
   const { settings } = useApp();
@@ -34,6 +36,7 @@ function AppContent() {
         <Stack.Screen name="quran-comparison" options={{ headerShown: false }} />
         <Stack.Screen name="hifz" options={{ headerShown: false }} />
       </Stack>
+      <FloatingPlayer />
     </>
   );
 }
@@ -42,7 +45,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <AppContent />
+        <AudioPlayerProvider>
+          <AppContent />
+        </AudioPlayerProvider>
       </AppProvider>
     </SafeAreaProvider>
   );

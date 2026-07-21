@@ -61,8 +61,18 @@ export interface NotificationSettings {
   reminderMinutesBefore: number;
 }
 
+export interface DarkModeSchedule {
+  enabled: boolean;
+  mode: 'custom' | 'sunrise_sunset';
+  startHour: number;   // 0-23
+  startMinute: number; // 0-59
+  endHour: number;
+  endMinute: number;
+}
+
 export interface AppSettings {
   theme: 'dark' | 'light' | 'system';
+  darkModeSchedule: DarkModeSchedule;
   arabicFontSize: number;
   translationFontSize: number;
   selectedTranslation: string;
@@ -161,6 +171,14 @@ const defaultNotifications: NotificationSettings = {
 
 const defaultSettings: AppSettings = {
   theme: 'dark',
+  darkModeSchedule: {
+    enabled: false,
+    mode: 'custom',
+    startHour: 21,
+    startMinute: 0,
+    endHour: 6,
+    endMinute: 0,
+  },
   arabicFontSize: 26,
   translationFontSize: 16,
   selectedTranslation: 'en.sahih',

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Switch, Alert,
+  View, Text, StyleSheet, ScrollView, Pressable, Switch, Alert, Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -23,10 +23,41 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { settings, updateSettings, colors: C, bookmarks, notes } = useApp();
   const [notifPermission, setNotifPermission] = useState<boolean | null>(null);
+  const [showSchedulePicker, setShowSchedulePicker] = useState<'start' | 'end' | null>(null);  const [tempHour, setTempHour] = useState(0);
+  const [tempMinute, setTempMinute] = useState(0);
 
   const handleThemeChange = (theme: ThemeOption) => {
     updateSettings({ theme });
   };
+
+  const updateSchedule = useCallback((updates: Partial<typeof settings.darkModeSchedule>) => {
+    updateSettings({
+      darkModeSchedule: { ...settings.darkModeSchedule, ...updates },
+    });
+  }, [settings.darkModeSchedule, updateSettings]);
+
+  const openTimePicker = (which: 'start' | 'end') => {
+    if (which === 'start') {
+      setTempHour(settings.darkModeSchedule.startHour);
+      setTempMinute(settings.darkModeSchedule.startMinute);
+    } else {
+      setTempHour(settings.darkModeSchedule.endHour);
+      setTempMinute(settings.darkModeSchedule.endMinute);
+    }
+    setShowSchedulePicker(which);
+  };
+
+  const confirmTimePicker = () => {
+    if (showSchedulePicker === 'start') {
+      updateSchedule({ startHour: tempHour, startMinute: tempMinute });
+    } else if (showSchedulePicker === 'end') {
+      updateSchedule({ endHour: tempHour, endMinute: tempMinute });
+    }
+    setShowSchedulePicker(null);
+  };
+
+  const fmt = (h: number, m: number) =>
+    `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 
   const handleNotificationToggle = useCallback(async (
     key: keyof typeof settings.notifications,
@@ -197,6 +228,140 @@ export default function SettingsScreen() {
                 </Pressable>
               ))}
             </View>
+          </View>
+          <Divider />
+
+          {/* Live Theme Preview */}
+          <View style={[styles.themePreviewRow, { paddingHorizontal: Spacing.md, paddingVertical: Spacing.md }]}>
+            <Text style={[styles.rowLabel, { color: C.textPrimary, marginBottom: 10 }]}>Live Preview</Text>
+            <View style={styles.themePreviews}>
+              {/* Dark preview */}
+              <View style={[styles.previewCard, { backgroundColor: '#0D1F1A', borderColor: '#1B4D3E' }]}>
+                <View style={styles.previewHeader}>
+                  <View style={[styles.previewDot, { backgroundColor: '#C9A84C' }]} />
+                  <View style={[styles.previewLine, { backgroundColor: '#C9A84C', width: 40 }]} />
+                </View>
+                <View style={[styles.previewLine, { backgroundColor: '#E8D5B7', width: '90%', height: 3, marginBottom: 4 }]} />
+                <View style={[styles.previewLine, { backgroundColor: '#9BA5A0', width: '70%', height: 2 }]} />
+                <View style={[styles.previewBtn, { backgroundColor: '#1B4D3E' }]}>
+                  <View style={[styles.previewLine, { backgroundColor: '#C9A84C', width: 30, height: 2 }]} />
+                </View>
+                <Text style={[styles.previewLabel, { color: '#9BA5A0' }]}>Dark</Text>
+              </View>
+              {/* Light preview */}
+              <View style={[styles.previewCard, { backgroundColor: '#F5F7F6', borderColor: '#D4E6DF' }]}>
+                <View style={styles.previewHeader}>
+                  <View style={[styles.previewDot, { backgroundColor: '#1B4D3E' }]} />
+                  <View style={[styles.previewLine, { backgroundColor: '#1B4D3E', width: 40 }]} />
+                </View>
+                <View style={[styles.previewLine, { backgroundColor: '#1A1A1A', width: '90%', height: 3, marginBottom: 4 }]} />
+                <View style={[styles.previewLine, { backgroundColor: '#5A6B65', width: '70%', height: 2 }]} />
+                <View style={[styles.previewBtn, { backgroundColor: '#1B4D3E' }]}>
+                  <View style={[styles.previewLine, { backgroundColor: '#C9A84C', width: 30, height: 2 }]} />
+                </View>
+                <Text style={[styles.previewLabel, { color: '#5A6B65' }]}>Light</Text>
+              </View>
+            </View>
+          </View>
+          <Divider />
+
+          {/* Dark Mode Scheduling */}
+          <View style={[styles.scheduleSection, { paddingHorizontal: Spacing.md, paddingVertical: Spacing.md }]}>
+            <View style={styles.scheduleHeader}>
+              <View style={[styles.rowIcon, { backgroundColor: `${C.gold}15` }]}>
+                <MaterialIcons name="schedule" size={18} color={C.gold} />
+              </View>
+              <View style={styles.rowInfo}>
+                <Text style={[styles.rowLabel, { color: C.textPrimary }]}>Auto Dark Mode Schedule</Text>
+                <Text style={[styles.rowSub, { color: C.textMuted }]}>
+                  Automatically switch to dark mode at set times
+                </Text>
+              </View>
+              <Switch
+                value={settings.darkModeSchedule.enabled}
+                onValueChange={v => updateSchedule({ enabled: v })}
+                trackColor={{ false: C.cardBorder, true: `${C.gold}80` }}
+                thumbColor={settings.darkModeSchedule.enabled ? C.gold : C.textMuted}
+                ios_backgroundColor={C.cardBorder}
+              />
+            </View>
+
+            {settings.darkModeSchedule.enabled && (
+              <View style={[styles.scheduleBody, { backgroundColor: C.surfaceElevated, borderColor: C.cardBorder }]}>
+                {/* Mode selector */}
+                <View style={styles.scheduleModeRow}>
+                  {(['custom', 'sunrise_sunset'] as const).map(mode => (
+                    <Pressable
+                      key={mode}
+                      style={[
+                        styles.scheduleModeBtn,
+                        { backgroundColor: C.card, borderColor: C.cardBorder },
+                        settings.darkModeSchedule.mode === mode && {
+                          backgroundColor: `${C.gold}15`,
+                          borderColor: C.gold,
+                        },
+                      ]}
+                      onPress={() => updateSchedule({ mode })}
+                    >
+                      <MaterialIcons
+                        name={mode === 'custom' ? 'access-time' : 'wb-twilight'}
+                        size={16}
+                        color={settings.darkModeSchedule.mode === mode ? C.gold : C.textMuted}
+                      />
+                      <Text style={[styles.scheduleModeTxt, {
+                        color: settings.darkModeSchedule.mode === mode ? C.gold : C.textMuted,
+                      }]}>
+                        {mode === 'custom' ? 'Custom Time' : 'Sunrise/Sunset'}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {settings.darkModeSchedule.mode === 'custom' ? (
+                  <View style={styles.timePickerRow}>
+                    <Pressable
+                      style={[styles.timeBtn, { backgroundColor: C.card, borderColor: `${C.gold}30` }]}
+                      onPress={() => openTimePicker('start')}
+                    >
+                      <MaterialIcons name="nights-stay" size={16} color={C.gold} />
+                      <View>
+                        <Text style={[styles.timeBtnLabel, { color: C.textMuted }]}>Dark mode ON</Text>
+                        <Text style={[styles.timeBtnValue, { color: C.gold }]}>
+                          {fmt(settings.darkModeSchedule.startHour, settings.darkModeSchedule.startMinute)}
+                        </Text>
+                      </View>
+                    </Pressable>
+                    <MaterialIcons name="arrow-forward" size={18} color={C.textMuted} />
+                    <Pressable
+                      style={[styles.timeBtn, { backgroundColor: C.card, borderColor: `${C.gold}30` }]}
+                      onPress={() => openTimePicker('end')}
+                    >
+                      <MaterialIcons name="wb-sunny" size={16} color={C.gold} />
+                      <View>
+                        <Text style={[styles.timeBtnLabel, { color: C.textMuted }]}>Dark mode OFF</Text>
+                        <Text style={[styles.timeBtnValue, { color: C.gold }]}>
+                          {fmt(settings.darkModeSchedule.endHour, settings.darkModeSchedule.endMinute)}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={[styles.sunriseBanner, { backgroundColor: `${C.gold}10` }]}>
+                    <MaterialIcons name="wb-twilight" size={20} color={C.gold} />
+                    <Text style={[styles.sunriseText, { color: C.textSecondary }]}>
+                      Dark mode activates at sunset and deactivates at sunrise based on your GPS location.
+                    </Text>
+                  </View>
+                )}
+
+                <View style={[styles.scheduleNote, { borderTopColor: C.divider }]}>
+                  <MaterialIcons name="info-outline" size={12} color={C.info} />
+                  <Text style={[styles.scheduleNoteText, { color: C.textMuted }]}>
+                    Schedule overrides your manual theme selection when active.
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
           <Divider />
 
@@ -450,6 +615,83 @@ export default function SettingsScreen() {
           </Pressable>
         </Section>
 
+        {/* ── Time Picker Modal ─────────────────────────────────────────────── */}
+        <Modal visible={showSchedulePicker !== null} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: C.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: C.cardBorder }]}>
+                <Text style={[styles.modalTitle, { color: C.textPrimary }]}>
+                  {showSchedulePicker === 'start' ? 'Dark Mode ON Time' : 'Dark Mode OFF Time'}
+                </Text>
+                <Pressable onPress={() => setShowSchedulePicker(null)}>
+                  <MaterialIcons name="close" size={24} color={C.textPrimary} />
+                </Pressable>
+              </View>
+
+              <View style={styles.timePickerBody}>
+                {/* Hour selector */}
+                <View style={styles.timePickerCol}>
+                  <Text style={[styles.timePickerColLabel, { color: C.textMuted }]}>Hour</Text>
+                  <ScrollView style={styles.timePickerScroll} showsVerticalScrollIndicator={false}>
+                    {Array.from({ length: 24 }, (_, i) => i).map(h => (
+                      <Pressable
+                        key={h}
+                        style={[
+                          styles.timeOption,
+                          { backgroundColor: C.card, borderColor: C.cardBorder },
+                          tempHour === h && { backgroundColor: `${C.gold}20`, borderColor: C.gold },
+                        ]}
+                        onPress={() => setTempHour(h)}
+                      >
+                        <Text style={[styles.timeOptionText, { color: tempHour === h ? C.gold : C.textPrimary }]}>
+                          {h.toString().padStart(2, '0')}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                <Text style={[styles.timeColon, { color: C.gold }]}>:</Text>
+
+                {/* Minute selector */}
+                <View style={styles.timePickerCol}>
+                  <Text style={[styles.timePickerColLabel, { color: C.textMuted }]}>Minute</Text>
+                  <ScrollView style={styles.timePickerScroll} showsVerticalScrollIndicator={false}>
+                    {[0, 15, 30, 45].map(m => (
+                      <Pressable
+                        key={m}
+                        style={[
+                          styles.timeOption,
+                          { backgroundColor: C.card, borderColor: C.cardBorder },
+                          tempMinute === m && { backgroundColor: `${C.gold}20`, borderColor: C.gold },
+                        ]}
+                        onPress={() => setTempMinute(m)}
+                      >
+                        <Text style={[styles.timeOptionText, { color: tempMinute === m ? C.gold : C.textPrimary }]}>
+                          {m.toString().padStart(2, '0')}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              </View>
+
+              <View style={[styles.timePickerPreview, { backgroundColor: `${C.gold}10`, borderColor: `${C.gold}20` }]}>
+                <Text style={[styles.timePickerPreviewText, { color: C.gold }]}>
+                  Selected: {tempHour.toString().padStart(2, '0')}:{tempMinute.toString().padStart(2, '0')}
+                </Text>
+              </View>
+
+              <Pressable
+                style={[styles.confirmBtn, { backgroundColor: C.gold }]}
+                onPress={confirmTimePicker}
+              >
+                <Text style={[styles.confirmBtnText, { color: C.primaryDark }]}>Confirm</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
         {/* ── About ─────────────────────────────────────────────────────────── */}
         <Section title="About">
           <View style={[styles.aboutCard, { backgroundColor: `${C.primary}15` }]}>
@@ -577,4 +819,102 @@ const styles = StyleSheet.create({
   aboutName: { fontSize: 16, fontWeight: '700' },
   aboutVersion: { fontSize: 12 },
   aboutDesc: { fontSize: 13, textAlign: 'center', lineHeight: 20, marginTop: 4 },
+
+  // Schedule styles
+  scheduleSection: {},
+  scheduleHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, minHeight: 60 },
+  scheduleBody: {
+    marginTop: Spacing.sm,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  scheduleModeRow: { flexDirection: 'row', gap: 8, padding: 12 },
+  scheduleModeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  scheduleModeTxt: { fontSize: 12, fontWeight: '600' },
+  timePickerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+  timeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  timeBtnLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase' },
+  timeBtnValue: { fontSize: 20, fontWeight: '700', marginTop: 2 },
+  sunriseBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    margin: 12,
+    borderRadius: Radius.md,
+  },
+  sunriseText: { flex: 1, fontSize: 13, lineHeight: 20 },
+  scheduleNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: 10,
+    borderTopWidth: 1,
+  },
+  scheduleNoteText: { flex: 1, fontSize: 11 },
+
+  // Theme previews
+  themePreviewRow: {},
+  themePreviews: { flexDirection: 'row', gap: 16 },
+  previewCard: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+    gap: 6,
+    alignItems: 'flex-start',
+  },
+  previewHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  previewDot: { width: 10, height: 10, borderRadius: 5 },
+  previewLine: { borderRadius: 2 },
+  previewBtn: { borderRadius: 6, padding: 6, alignSelf: 'stretch', alignItems: 'center', marginTop: 4 },
+  previewLabel: { fontSize: 11, fontWeight: '600', alignSelf: 'center', marginTop: 4 },
+
+  // Time picker modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: Spacing.md },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  timePickerBody: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: Spacing.md },
+  timePickerCol: { flex: 1 },
+  timePickerColLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, textAlign: 'center' },
+  timePickerScroll: { maxHeight: 200 },
+  timeOption: { padding: 12, borderRadius: Radius.md, borderWidth: 1, marginBottom: 6, alignItems: 'center' },
+  timeOptionText: { fontSize: 20, fontWeight: '700' },
+  timeColon: { fontSize: 28, fontWeight: '900', flexShrink: 0 },
+  timePickerPreview: {
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  timePickerPreviewText: { fontSize: 20, fontWeight: '700' },
+  confirmBtn: { alignItems: 'center', padding: Spacing.md, borderRadius: Radius.md, marginBottom: Spacing.sm },
+  confirmBtnText: { fontSize: 16, fontWeight: '700' },
 });
