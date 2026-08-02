@@ -47,12 +47,15 @@ export default function MoreScreen() {
         { id: 'hifz', title: 'Hifz Manager', subtitle: 'Quran memorization tracker & test mode', icon: 'psychology', color: '#2D4A2D', route: '/hifz' },
         { id: 'comparison', title: 'Quran Comparison', subtitle: 'View 2-3 translations side-by-side', icon: 'compare-arrows', color: '#6B4A2D', route: '/quran-comparison' },
         { id: 'mosque-finder', title: 'Mosque Finder', subtitle: 'Find nearby mosques with GPS', icon: 'location-on', color: '#2D6B2D', route: '/mosque-finder' },
+        { id: 'quran-search', title: 'Quran Search', subtitle: 'Search verses by keyword or Arabic text', icon: 'manage-search', color: '#1B5E6B', route: '/quran-search' },
+        { id: 'salah-tracker', title: 'Salah Tracker', subtitle: '5 daily prayers, streak & heatmap', icon: 'check-circle', color: '#2D6B3A', route: '/salah-tracker' },
       ],
     },
     {
       title: 'Personal',
       items: [
         { id: 'bookmarks', title: 'Bookmarks', subtitle: 'Saved verses, hadiths & duas', icon: 'bookmark', color: '#6B6B2D', route: '/bookmarks' },
+        { id: 'notes', title: 'Notes & Highlights', subtitle: 'Notes, verse highlights & tags', icon: 'note', color: '#4A2D7A', route: '/notes-library' },
         { id: 'settings', title: 'Settings', subtitle: 'Theme, translations, reciters', icon: 'settings', color: '#4A4A4A', route: '/settings' },
       ],
     },

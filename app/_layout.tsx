@@ -35,6 +35,9 @@ function AppContent() {
         <Stack.Screen name="mosque-finder" options={{ headerShown: false }} />
         <Stack.Screen name="quran-comparison" options={{ headerShown: false }} />
         <Stack.Screen name="hifz" options={{ headerShown: false }} />
+        <Stack.Screen name="quran-search" options={{ headerShown: false }} />
+        <Stack.Screen name="salah-tracker" options={{ headerShown: false }} />
+        <Stack.Screen name="notes-library" options={{ headerShown: false }} />
       </Stack>
       <FloatingPlayer />
     </>

@@ -21,6 +21,28 @@ export interface Note {
   reference: string;
   content: string;
   timestamp: number;
+  tags?: string[];
+  surahNumber?: number;
+  ayahNumber?: number;
+}
+
+export interface Highlight {
+  id: string;
+  surahNumber: number;
+  ayahNumber: number;
+  color: 'yellow' | 'green' | 'blue' | 'red';
+  verseText?: string;
+  timestamp: number;
+}
+
+export interface SalahRecord {
+  date: string; // YYYY-MM-DD
+  fajr: boolean;
+  dhuhr: boolean;
+  asr: boolean;
+  maghrib: boolean;
+  isha: boolean;
+  journal?: string;
 }
 
 export interface AIMessage {
@@ -142,6 +164,17 @@ interface AppContextType {
   fastingDays: FastingDay[];
   toggleFastingDay: (date: string) => void;
 
+  // Highlights
+  highlights: Highlight[];
+  addHighlight: (h: Omit<Highlight, 'id' | 'timestamp'>) => void;
+  removeHighlight: (surahNumber: number, ayahNumber: number) => void;
+  getHighlight: (surahNumber: number, ayahNumber: number) => Highlight | undefined;
+
+  // Salah Tracker
+  salahRecords: SalahRecord[];
+  toggleSalah: (date: string, prayer: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha') => void;
+  updateSalahJournal: (date: string, journal: string) => void;
+
   // Asma-ul-Husna Favorites
   asmaFavorites: number[];
   toggleAsmaFavorite: (num: number) => void;
@@ -218,6 +251,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [fastingDays, setFastingDays] = useState<FastingDay[]>([]);
   const [asmaFavorites, setAsmaFavorites] = useState<number[]>([]);
   const [nameFavorites, setNameFavorites] = useState<string[]>([]);
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [salahRecords, setSalahRecords] = useState<SalahRecord[]>([]);
   const [systemColorScheme, setSystemColorScheme] = useState<ColorSchemeName>(Appearance.getColorScheme());
 
   // Resolve effective theme
@@ -245,7 +280,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const keys = [
         'app_settings_v2', 'bookmarks', 'notes', 'last_read',
         'tasbeeh_history', 'favorite_duas', 'ai_messages', 'ai_conversations',
-        'fasting_days', 'asma_favorites', 'name_favorites',
+        'fasting_days', 'asma_favorites', 'name_favorites', 'highlights', 'salah_records',
       ];
       const results = await AsyncStorage.multiGet(keys);
       const map = Object.fromEntries(results.map(([k, v]) => [k, v]));
@@ -268,6 +303,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (map['fasting_days']) setFastingDays(JSON.parse(map['fasting_days']));
       if (map['asma_favorites']) setAsmaFavorites(JSON.parse(map['asma_favorites']));
       if (map['name_favorites']) setNameFavorites(JSON.parse(map['name_favorites']));
+      if (map['highlights']) setHighlights(JSON.parse(map['highlights']));
+      if (map['salah_records']) setSalahRecords(JSON.parse(map['salah_records']));
     } catch { /* use defaults */ }
   };
 
@@ -426,6 +463,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await AsyncStorage.setItem('name_favorites', JSON.stringify(updated));
   }, [nameFavorites]);
 
+  // ── Highlights ────────────────────────────────────────────────────────────────
+
+  const addHighlight = useCallback(async (h: Omit<Highlight, 'id' | 'timestamp'>) => {
+    const filtered = highlights.filter(x => !(x.surahNumber === h.surahNumber && x.ayahNumber === h.ayahNumber));
+    const newH: Highlight = { ...h, id: `hl_${Date.now()}`, timestamp: Date.now() };
+    const updated = [newH, ...filtered];
+    setHighlights(updated);
+    await AsyncStorage.setItem('highlights', JSON.stringify(updated));
+  }, [highlights]);
+
+  const removeHighlight = useCallback(async (surahNumber: number, ayahNumber: number) => {
+    const updated = highlights.filter(h => !(h.surahNumber === surahNumber && h.ayahNumber === ayahNumber));
+    setHighlights(updated);
+    await AsyncStorage.setItem('highlights', JSON.stringify(updated));
+  }, [highlights]);
+
+  const getHighlight = useCallback((surahNumber: number, ayahNumber: number): Highlight | undefined => {
+    return highlights.find(h => h.surahNumber === surahNumber && h.ayahNumber === ayahNumber);
+  }, [highlights]);
+
+  // ── Salah Tracker ─────────────────────────────────────────────────────────────
+
+  const toggleSalah = useCallback(async (date: string, prayer: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha') => {
+    const existing = salahRecords.find(r => r.date === date);
+    let updated: SalahRecord[];
+    if (existing) {
+      updated = salahRecords.map(r => r.date === date ? { ...r, [prayer]: !r[prayer] } : r);
+    } else {
+      const newRecord: SalahRecord = {
+        date,
+        fajr: prayer === 'fajr',
+        dhuhr: prayer === 'dhuhr',
+        asr: prayer === 'asr',
+        maghrib: prayer === 'maghrib',
+        isha: prayer === 'isha',
+      };
+      updated = [...salahRecords, newRecord];
+    }
+    setSalahRecords(updated);
+    await AsyncStorage.setItem('salah_records', JSON.stringify(updated));
+  }, [salahRecords]);
+
+  const updateSalahJournal = useCallback(async (date: string, journal: string) => {
+    const existing = salahRecords.find(r => r.date === date);
+    let updated: SalahRecord[];
+    if (existing) {
+      updated = salahRecords.map(r => r.date === date ? { ...r, journal } : r);
+    } else {
+      updated = [...salahRecords, { date, fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false, journal }];
+    }
+    setSalahRecords(updated);
+    await AsyncStorage.setItem('salah_records', JSON.stringify(updated));
+  }, [salahRecords]);
+
   return (
     <AppContext.Provider value={{
       colors,
@@ -462,6 +553,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toggleAsmaFavorite,
       nameFavorites,
       toggleNameFavorite,
+      highlights,
+      addHighlight,
+      removeHighlight,
+      getHighlight,
+      salahRecords,
+      toggleSalah,
+      updateSalahJournal,
     }}>
       {children}
     </AppContext.Provider>

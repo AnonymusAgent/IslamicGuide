@@ -39,11 +39,30 @@ export default function SurahScreen() {
   const surahNum = parseInt(id || '1', 10);
   const surahMeta = SURAH_LIST[surahNum - 1];
 
-  const { settings, updateSettings, addBookmark, removeBookmark, isBookmarked, setLastRead, updateReadingProgress, colors: C } = useApp();
+  const { settings, updateSettings, addBookmark, removeBookmark, isBookmarked, setLastRead, updateReadingProgress, colors: C, addHighlight, removeHighlight, getHighlight, addNote } = useApp();
   const { playSurah, isPlaying: globalIsPlaying, nowPlaying, togglePlayPause } = useAudioPlayer();
   const { data, loading, error, reload } = useSurah(surahNum, settings.selectedTranslation);
 
-  const [showSettings, setShowSettings] = useState(false);
+  const [highlightPickerAyah, setHighlightPickerAyah] = useState<number | null>(null);
+  const [noteInputAyah, setNoteInputAyah] = useState<number | null>(null);
+  const [noteText, setNoteText] = useState('');
+  const [noteTags, setNoteTags] = useState('');
+
+  const HIGHLIGHT_BG: Record<string, string> = {
+    yellow: 'rgba(255,215,0,0.15)',
+    green: 'rgba(76,175,80,0.15)',
+    blue: 'rgba(33,150,243,0.15)',
+    red: 'rgba(244,67,54,0.15)',
+  };
+  const HIGHLIGHT_BORDER: Record<string, string> = {
+    yellow: 'rgba(255,215,0,0.5)',
+    green: 'rgba(76,175,80,0.5)',
+    blue: 'rgba(33,150,243,0.5)',
+    red: 'rgba(244,67,54,0.5)',
+  };
+  const HIGHLIGHT_SOLID: Record<string, string> = {
+    yellow: '#FFD700', green: '#4CAF50', blue: '#2196F3', red: '#F44336',
+  };
   const [currentAyah, setCurrentAyah] = useState<number | null>(null);
   const [selectedAyah, setSelectedAyah] = useState<number | null>(null);
   const [wordByWordData, setWordByWordData] = useState<Record<number, WordData[]>>({});
@@ -125,6 +144,10 @@ export default function SurahScreen() {
     const ayahBookmarked = isBookmarked(`quran_${surahNum}_${ayahNum}`);
     const wbwData = wordByWordData[ayahNum];
     const showWBW = settings.showWordByWord && isSelected;
+    const highlight = getHighlight(surahNum, ayahNum);
+    const hlBg = highlight ? HIGHLIGHT_BG[highlight.color] : undefined;
+    const hlBorder = highlight ? HIGHLIGHT_BORDER[highlight.color] : undefined;
+    const hlSolid = highlight ? HIGHLIGHT_SOLID[highlight.color] : undefined;
 
     return (
       <Pressable
@@ -133,6 +156,7 @@ export default function SurahScreen() {
           { borderBottomColor: C.cardBorder },
           isSelected && [styles.ayahSelected, { backgroundColor: `${C.gold}08` }],
           isActive && [styles.ayahActive, { backgroundColor: `${C.primary}20` }],
+          hlBg && { backgroundColor: hlBg, borderLeftWidth: 3, borderLeftColor: hlBorder },
         ]}
         onPress={() => {
           setSelectedAyah(isSelected ? null : ayahNum);
@@ -243,6 +267,16 @@ export default function SurahScreen() {
               <MaterialIcons name="flag" size={18} color={C.textMuted} />
               <Text style={[styles.ayahActionText, { color: C.textMuted }]}>Mark</Text>
             </Pressable>
+            <Pressable style={styles.ayahActionBtn} onPress={() => { setNoteInputAyah(ayahNum); setNoteText(''); setNoteTags(''); }}>
+              <MaterialIcons name="note-add" size={18} color={C.textMuted} />
+              <Text style={[styles.ayahActionText, { color: C.textMuted }]}>Note</Text>
+            </Pressable>
+            <Pressable style={styles.ayahActionBtn} onPress={() => setHighlightPickerAyah(ayahNum)}>
+              <MaterialIcons name="format-color-fill" size={18} color={hlSolid || C.textMuted} />
+              <Text style={[styles.ayahActionText, { color: hlSolid || C.textMuted }]}>
+                {highlight ? 'Highlighted' : 'Highlight'}
+              </Text>
+            </Pressable>
             <Pressable style={styles.ayahActionBtn} onPress={() => router.push(`/tafsir/${surahNum}` as any)}>
               <MaterialIcons name="menu-book" size={18} color={C.textMuted} />
               <Text style={[styles.ayahActionText, { color: C.textMuted }]}>Tafsir</Text>
@@ -255,7 +289,7 @@ export default function SurahScreen() {
         )}
       </Pressable>
     );
-  }, [data, settings, selectedAyah, currentAyah, wordByWordData, loadingWBW, C]);
+  }, [data, settings, selectedAyah, currentAyah, wordByWordData, loadingWBW, C, getHighlight, addHighlight, removeHighlight]);
 
   if (loading) {
     return (
@@ -355,6 +389,120 @@ export default function SurahScreen() {
           {isPlaying && <Text style={[styles.playingLabel, { color: C.gold }]}>▶ Playing</Text>}
         </View>
       </View>
+
+      {/* ── Highlight Picker Modal ───────────────────────────────────────── */}
+      <Modal visible={highlightPickerAyah !== null} transparent animationType="fade">
+        <Pressable style={styles.modalOverlay} onPress={() => setHighlightPickerAyah(null)}>
+          <View style={[styles.highlightPickerBox, { backgroundColor: C.surface }]}>
+            <Text style={[styles.highlightPickerTitle, { color: C.textPrimary }]}>Highlight Verse</Text>
+            <View style={styles.highlightColors}>
+              {(['yellow', 'green', 'blue', 'red'] as const).map(color => (
+                <Pressable
+                  key={color}
+                  style={[styles.highlightColorBtn, { backgroundColor: HIGHLIGHT_BG[color], borderColor: HIGHLIGHT_BORDER[color] }]}
+                  onPress={() => {
+                    if (highlightPickerAyah) {
+                      const existing = getHighlight(surahNum, highlightPickerAyah);
+                      if (existing?.color === color) {
+                        removeHighlight(surahNum, highlightPickerAyah);
+                      } else {
+                        addHighlight({
+                          surahNumber: surahNum,
+                          ayahNumber: highlightPickerAyah,
+                          color,
+                          verseText: data?.translation?.ayahs[(highlightPickerAyah ?? 1) - 1]?.text,
+                        });
+                      }
+                    }
+                    setHighlightPickerAyah(null);
+                  }}
+                >
+                  <View style={[styles.highlightColorDot, { backgroundColor: HIGHLIGHT_SOLID[color] }]} />
+                  <Text style={[styles.highlightColorLabel, { color: C.textSecondary }]}>
+                    {color.charAt(0).toUpperCase() + color.slice(1)}
+                  </Text>
+                  {highlightPickerAyah && getHighlight(surahNum, highlightPickerAyah)?.color === color && (
+                    <MaterialIcons name="check" size={14} color={HIGHLIGHT_SOLID[color]} />
+                  )}
+                </Pressable>
+              ))}
+            </View>
+            {highlightPickerAyah && getHighlight(surahNum, highlightPickerAyah) && (
+              <Pressable
+                style={[styles.removeHighlightBtn, { borderColor: C.error }]}
+                onPress={() => {
+                  if (highlightPickerAyah) removeHighlight(surahNum, highlightPickerAyah);
+                  setHighlightPickerAyah(null);
+                }}
+              >
+                <MaterialIcons name="highlight-off" size={16} color={C.error} />
+                <Text style={[styles.removeHighlightText, { color: C.error }]}>Remove Highlight</Text>
+              </Pressable>
+            )}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* ── Note Input Modal ──────────────────────────────────────────────── */}
+      <Modal visible={noteInputAyah !== null} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.noteModalBox, { backgroundColor: C.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: C.cardBorder }]}>
+              <Text style={[styles.modalTitle, { color: C.textPrimary }]}>
+                Note — {surahMeta?.transliteration} {surahNum}:{noteInputAyah}
+              </Text>
+              <Pressable onPress={() => setNoteInputAyah(null)}>
+                <MaterialIcons name="close" size={22} color={C.textPrimary} />
+              </Pressable>
+            </View>
+            <TextInput
+              style={[styles.noteTextArea, { color: C.textPrimary, backgroundColor: C.card, borderColor: C.cardBorder }]}
+              placeholder="Write your note or reflection..."
+              placeholderTextColor={C.textMuted}
+              value={noteText}
+              onChangeText={setNoteText}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              autoFocus
+            />
+            <TextInput
+              style={[styles.noteTagInput, { color: C.textPrimary, backgroundColor: C.card, borderColor: C.cardBorder }]}
+              placeholder="Tags (comma-separated): faith, patience..."
+              placeholderTextColor={C.textMuted}
+              value={noteTags}
+              onChangeText={setNoteTags}
+            />
+            <View style={styles.noteModalBtns}>
+              <Pressable
+                style={[styles.noteModalCancel, { backgroundColor: C.card, borderColor: C.cardBorder }]}
+                onPress={() => setNoteInputAyah(null)}
+              >
+                <Text style={[styles.noteModalCancelText, { color: C.textSecondary }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.noteModalSave, { backgroundColor: C.gold }]}
+                onPress={() => {
+                  if (noteText.trim() && noteInputAyah) {
+                    addNote({
+                      type: 'quran',
+                      reference: `quran_${surahNum}_${noteInputAyah}`,
+                      content: noteText.trim(),
+                      tags: noteTags.trim() ? noteTags.split(',').map(t => t.trim()).filter(Boolean) : [],
+                      surahNumber: surahNum,
+                      ayahNumber: noteInputAyah,
+                    });
+                  }
+                  setNoteInputAyah(null);
+                }}
+              >
+                <MaterialIcons name="save" size={16} color={C.primaryDark} />
+                <Text style={[styles.noteModalSaveText, { color: C.primaryDark }]}>Save Note</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Settings Modal */}
       <Modal visible={showSettings} transparent animationType="slide">
@@ -653,4 +801,75 @@ const styles = StyleSheet.create({
   reciterItemText: {},
   reciterItemTextActive: {},
   reciterStyle: { fontSize: 12 },
+
+  // Highlight picker
+  highlightPickerBox: {
+    margin: 40,
+    borderRadius: 20,
+    padding: 20,
+    gap: 12,
+  },
+  highlightPickerTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  highlightColors: { flexDirection: 'row', gap: 8 },
+  highlightColorBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    gap: 5,
+  },
+  highlightColorDot: { width: 20, height: 20, borderRadius: 10 },
+  highlightColorLabel: { fontSize: 11, fontWeight: '600' },
+  removeHighlightBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  removeHighlightText: { fontSize: 13, fontWeight: '600' },
+
+  // Note modal
+  noteModalBox: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: Spacing.md,
+  },
+  noteTextArea: {
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 15,
+    minHeight: 100,
+    marginBottom: Spacing.sm,
+  },
+  noteTagInput: {
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 14,
+    marginBottom: Spacing.md,
+  },
+  noteModalBtns: { flexDirection: 'row', gap: 10, marginBottom: Spacing.sm },
+  noteModalCancel: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  noteModalCancelText: { fontSize: 14, fontWeight: '600' },
+  noteModalSave: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: Radius.md,
+  },
+  noteModalSaveText: { fontSize: 14, fontWeight: '700' },
 });
