@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Pressable,
   ActivityIndicator, Share, Alert, Platform, Modal,
-  ScrollView,
+  ScrollView, TextInput,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -47,6 +47,7 @@ export default function SurahScreen() {
   const [noteInputAyah, setNoteInputAyah] = useState<number | null>(null);
   const [noteText, setNoteText] = useState('');
   const [noteTags, setNoteTags] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
 
   const HIGHLIGHT_BG: Record<string, string> = {
     yellow: 'rgba(255,215,0,0.15)',

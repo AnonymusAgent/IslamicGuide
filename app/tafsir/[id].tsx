@@ -17,6 +17,12 @@ import { Spacing, Radius } from '../../constants/theme';
 import { useApp } from '../../contexts/AppContext';
 import { SURAH_LIST } from '../../constants/quranData';
 import { fetchSurah } from '../../services/quranService';
+import {
+  getTafsirFromCache,
+  saveTafsirToCache,
+  isTafsirCached,
+  TOP_SURAHS_FOR_TAFSIR,
+} from '../../services/tafsirCacheService';
 
 const TAFSIR_EDITIONS = [
   { id: 'en.ibn-katheer', name: 'Ibn Kathir (English)', lang: 'English', scholar: 'Ibn Kathir' },
@@ -77,10 +83,18 @@ export default function TafsirScreen() {
   const loadTafsir = async () => {
     setState({ loading: true, error: null, data: [] });
 
-    // Try cache first
-    const cached = await loadCached(cacheKey);
-    if (cached) {
-      setState({ loading: false, error: null, data: cached });
+    // 1. Try tafsirCacheService (pre-cached top surahs)
+    const serviceCache = await getTafsirFromCache(surahNum, selectedEdition);
+    if (serviceCache && serviceCache.length > 0) {
+      setState({ loading: false, error: null, data: serviceCache });
+      setOfflineBadge(true);
+      return;
+    }
+
+    // 2. Try legacy AsyncStorage cache
+    const legacyCached = await loadCached(cacheKey);
+    if (legacyCached) {
+      setState({ loading: false, error: null, data: legacyCached });
       setOfflineBadge(true);
       return;
     }
@@ -97,11 +111,13 @@ export default function TafsirScreen() {
         tafsirText: tafsirData.ayahs[i]?.text || '',
       }));
 
+      // Save to both cache systems
+      await saveTafsirToCache(surahNum, selectedEdition, merged);
       await saveCache(cacheKey, merged);
       setState({ loading: false, error: null, data: merged });
       setOfflineBadge(false);
     } catch {
-      setState({ loading: false, error: 'Failed to load Tafsir. Check your connection.', data: [] });
+      setState({ loading: false, error: 'Failed to load Tafsir. Check your connection and try again.', data: [] });
     }
   };
 

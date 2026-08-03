@@ -1,12 +1,36 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useEffect } from 'react';
 import { AppProvider, useApp } from '../contexts/AppContext';
 import { AudioPlayerProvider } from '../contexts/AudioPlayerContext';
 import FloatingPlayer from '../components/FloatingPlayer';
+import { initQuranOfflineCache } from '../services/quranService';
+import { preCacheTafsirBackground } from '../services/tafsirCacheService';
+import { schedulePrayerNotificationsWithGPS } from '../services/notificationService';
 
 function AppContent() {
   const { settings } = useApp();
+
+  // Kick off background pre-caching on first mount
+  useEffect(() => {
+    // Pre-cache top surahs and common translations
+    initQuranOfflineCache(
+      [1, 2, 3, 18, 36, 55, 67, 112, 113, 114],
+      [settings.selectedTranslation]
+    );
+    // Pre-cache Tafsir Ibn Kathir for top 10 surahs
+    preCacheTafsirBackground();
+    // Refresh GPS-based prayer notifications if enabled
+    const notifs = settings.notifications;
+    const anyPrayerEnabled =
+      notifs.fajrReminder || notifs.dhuhrReminder || notifs.asrReminder ||
+      notifs.maghribReminder || notifs.ishaReminder;
+    if (anyPrayerEnabled) {
+      schedulePrayerNotificationsWithGPS(notifs).catch(() => {});
+    }
+  }, [settings.selectedTranslation]);
+
   return (
     <>
       <StatusBar style={settings.theme === 'dark' ? 'light' : 'dark'} />

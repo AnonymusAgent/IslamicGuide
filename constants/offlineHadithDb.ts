@@ -555,12 +555,34 @@ export const OFFLINE_HADITHS: OfflineHadith[] = [
   },
 ];
 
+import { EXTENDED_HADITHS } from './offlineHadithDbExtended';
+
+/** Combined database: core + extended hadiths */
+const ALL_HADITHS: OfflineHadith[] = [...OFFLINE_HADITHS, ...EXTENDED_HADITHS];
+
 /** Returns all hadiths for a given collection (offline) */
 export function getOfflineHadiths(collectionId: string): OfflineHadith[] {
-  return OFFLINE_HADITHS.filter(h => h.collection === collectionId);
+  return ALL_HADITHS.filter(h => h.collection === collectionId);
 }
 
 /** Returns total count for a collection */
 export function getOfflineHadithCount(collectionId: string): number {
-  return OFFLINE_HADITHS.filter(h => h.collection === collectionId).length;
+  return ALL_HADITHS.filter(h => h.collection === collectionId).length;
+}
+
+/** Returns all hadiths (all collections merged) */
+export function getAllOfflineHadiths(): OfflineHadith[] {
+  return ALL_HADITHS;
+}
+
+/** Search hadiths by keyword across text, narrator, and reference */
+export function searchOfflineHadiths(query: string): OfflineHadith[] {
+  const q = query.toLowerCase();
+  return ALL_HADITHS.filter(h =>
+    h.english.toLowerCase().includes(q) ||
+    h.narrator.toLowerCase().includes(q) ||
+    h.reference.toLowerCase().includes(q) ||
+    h.bookName.toLowerCase().includes(q) ||
+    h.chapterName.toLowerCase().includes(q)
+  );
 }
