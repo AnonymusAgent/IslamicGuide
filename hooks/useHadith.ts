@@ -1,35 +1,54 @@
 import { useState, useCallback } from 'react';
-import { fetchHadithsByBook, fetchHadithByNumber, COLLECTION_API_MAP } from '../services/hadithService';
+import { getOfflineHadiths, searchOfflineHadiths, OfflineHadith } from '../constants/offlineHadithDb';
+import { fetchHadithPage, COLLECTION_TOTAL } from '../services/hadithService';
 
-export function useHadithCollection(collectionId: string) {
-  const [hadiths, setHadiths] = useState<any[]>([]);
+export function useHadith(collectionId: string) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 20;
 
-  const loadHadiths = useCallback(async (pageNum: number = 1) => {
-    const apiId = COLLECTION_API_MAP[collectionId] || collectionId;
+  const offlineHadiths = getOfflineHadiths(collectionId);
+  const totalKnown = COLLECTION_TOTAL[collectionId] ?? offlineHadiths.length;
+
+  const fetchPage = useCallback(async (page: number) => {
     setLoading(true);
     setError(null);
     try {
-      const start = (pageNum - 1) * PAGE_SIZE + 1;
-      const end = pageNum * PAGE_SIZE;
-      const data = await fetchHadithsByBook(apiId, `${start}-${end}`);
-      if (pageNum === 1) {
-        setHadiths(data.hadiths || []);
-      } else {
-        setHadiths(prev => [...prev, ...(data.hadiths || [])]);
-      }
-      setPage(pageNum);
-    } catch (e) {
-      setError('Failed to load hadiths. Please check your connection.');
+      const items = await fetchHadithPage(collectionId, page);
+      return items;
+    } catch (e: any) {
+      setError(e?.message || 'Failed to fetch hadiths');
+      return null;
     } finally {
       setLoading(false);
     }
   }, [collectionId]);
 
-  const loadMore = () => loadHadiths(page + 1);
+  return {
+    offlineHadiths,
+    totalKnown,
+    loading,
+    error,
+    fetchPage,
+  };
+}
 
-  return { hadiths, loading, error, loadHadiths, loadMore, page };
+export function useHadithSearch() {
+  const [results, setResults] = useState<OfflineHadith[]>([]);
+  const [query, setQuery] = useState('');
+
+  const search = useCallback((q: string) => {
+    setQuery(q);
+    if (!q.trim()) {
+      setResults([]);
+      return;
+    }
+    setResults(searchOfflineHadiths(q));
+  }, []);
+
+  const clear = useCallback(() => {
+    setQuery('');
+    setResults([]);
+  }, []);
+
+  return { results, query, search, clear };
 }
