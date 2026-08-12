@@ -24,6 +24,7 @@ export default function MoreScreen() {
       title: 'Islamic Content',
       items: [
         { id: 'hadith', title: 'Hadith Collections', subtitle: 'Bukhari, Muslim, Abu Dawood & more', icon: 'library-books', color: '#2D4A6B', route: '/hadith' },
+        { id: 'hadith-search', title: 'Hadith Search', subtitle: 'Search 180+ offline + cached online hadiths', icon: 'manage-search', color: '#1B4D6B', route: '/hadith/search' },
         { id: 'duas', title: 'Duas & Azkar', subtitle: 'Morning, Evening & Daily Supplications', icon: 'favorite', color: '#6B2D4A', route: '/duas' },
         { id: 'asma-ul-husna', title: '99 Names of Allah', subtitle: 'Asma-ul-Husna with explanations', icon: 'star', color: '#5B2D6B', route: '/asma-ul-husna' },
         { id: 'islamic-names', title: 'Islamic Baby Names', subtitle: 'Boys & girls names with meanings', icon: 'child-care', color: '#2D6B8A', route: '/islamic-names' },
@@ -49,6 +50,7 @@ export default function MoreScreen() {
         { id: 'mosque-finder', title: 'Mosque Finder', subtitle: 'Find nearby mosques with GPS', icon: 'location-on', color: '#2D6B2D', route: '/mosque-finder' },
         { id: 'quran-search', title: 'Quran Search', subtitle: 'Search verses by keyword or Arabic text', icon: 'manage-search', color: '#1B5E6B', route: '/quran-search' },
         { id: 'salah-tracker', title: 'Salah Tracker', subtitle: '5 daily prayers, streak & heatmap', icon: 'check-circle', color: '#2D6B3A', route: '/salah-tracker' },
+        { id: 'profile', title: 'Profile & Sync', subtitle: 'Data summary, cloud sync status', icon: 'account-circle', color: '#4A3D7A', route: '/profile' },
       ],
     },
     {

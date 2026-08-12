@@ -8,6 +8,7 @@ import FloatingPlayer from '../components/FloatingPlayer';
 import { initQuranOfflineCache } from '../services/quranService';
 import { preCacheTafsirBackground } from '../services/tafsirCacheService';
 import { schedulePrayerNotificationsWithGPS } from '../services/notificationService';
+import { preCacheAllCollections } from '../services/hadithService';
 
 function AppContent() {
   const { settings } = useApp();
@@ -21,6 +22,8 @@ function AppContent() {
     );
     // Pre-cache Tafsir Ibn Kathir for top 10 surahs
     preCacheTafsirBackground();
+    // Pre-cache first 3 pages of each Hadith collection in background
+    setTimeout(() => preCacheAllCollections(), 5000);
     // Refresh GPS-based prayer notifications if enabled
     const notifs = settings.notifications;
     const anyPrayerEnabled =
@@ -62,6 +65,8 @@ function AppContent() {
         <Stack.Screen name="quran-search" options={{ headerShown: false }} />
         <Stack.Screen name="salah-tracker" options={{ headerShown: false }} />
         <Stack.Screen name="notes-library" options={{ headerShown: false }} />
+        <Stack.Screen name="hadith/search" options={{ headerShown: false }} />
+        <Stack.Screen name="profile" options={{ headerShown: false }} />
       </Stack>
       <FloatingPlayer />
     </>

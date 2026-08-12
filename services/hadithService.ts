@@ -141,3 +141,25 @@ export async function clearHadithCache(): Promise<void> {
     await AsyncStorage.multiRemove(hadithKeys);
   } catch { /* silent */ }
 }
+
+/**
+ * Pre-cache the first 3 pages of each online collection in the background.
+ * Called on app start so users have immediate content without waiting.
+ */
+export async function preCacheAllCollections(): Promise<void> {
+  const collections = Object.keys(COLLECTION_API_MAP).filter(k => COLLECTION_API_MAP[k]);
+  const PAGES_TO_PRECACHE = 3;
+
+  for (const collection of collections) {
+    for (let page = 1; page <= PAGES_TO_PRECACHE; page++) {
+      const key = cacheKey(collection, page);
+      const existing = await readCache(key);
+      if (existing && existing.length > 0) continue; // Already cached
+      try {
+        await fetchHadithPage(collection, page);
+        // Small delay to avoid hammering the API
+        await new Promise(r => setTimeout(r, 400));
+      } catch { /* silent — non-blocking */ }
+    }
+  }
+}
