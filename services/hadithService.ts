@@ -7,7 +7,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 
 const HADITH_API = 'https://api.hadith.gading.dev';
-const FALLBACK_API = 'https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@df57907be35291c91ad6a6691180e22ca9920784/editions';
+const FALLBACK_APIS = [
+  'https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@df57907be35291c91ad6a6691180e22ca9920784/editions',
+  'https://raw.githubusercontent.com/fawazahmed0/hadith-api/df57907be35291c91ad6a6691180e22ca9920784/editions',
+];
 const CACHE_PREFIX = 'hadith_v2_';
 const CACHE_TIME_PREFIX = 'hadith_cache_time_';
 const CACHE_TOTAL_PREFIX = 'hadith_total_';
@@ -301,15 +304,17 @@ async function loadFallbackEdition(bookId: string, language: string): Promise<Fa
   if (cached) return cached;
 
   let lastError: unknown;
-  for (const format of ['min.json', 'json']) {
-    try {
-      const text = await fetchText(`${FALLBACK_API}/${language}-${bookId}.${format}`, FALLBACK_TIMEOUT);
-      const parsed: unknown = JSON.parse(text);
-      if (!isFallbackEdition(parsed)) throw new Error('Malformed Hadith edition');
-      await writeFallbackCache(bookId, language, text);
-      return parsed;
-    } catch (error) {
-      lastError = error;
+  for (const api of FALLBACK_APIS) {
+    for (const format of ['min.json', 'json']) {
+      try {
+        const text = await fetchText(`${api}/${language}-${bookId}.${format}`, FALLBACK_TIMEOUT);
+        const parsed: unknown = JSON.parse(text);
+        if (!isFallbackEdition(parsed)) throw new Error('Malformed Hadith edition');
+        await writeFallbackCache(bookId, language, text);
+        return parsed;
+      } catch (error) {
+        lastError = error;
+      }
     }
   }
 
