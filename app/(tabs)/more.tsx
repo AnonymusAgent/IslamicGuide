@@ -114,7 +114,7 @@ export default function MoreScreen() {
         {/* App Info */}
         <View style={[styles.appInfo, { margin: Spacing.md, marginTop: Spacing.xl, backgroundColor: `${C.primary}20`, borderRadius: Radius.lg, borderWidth: 1, borderColor: `${C.gold}20` }]}>
           <Text style={[styles.appName, { color: C.gold }]}>🕌 Islamic Guide</Text>
-          <Text style={[styles.appVersion, { color: C.textMuted }]}>v2.0.0 · Powered by OnSpace AI</Text>
+          <Text style={[styles.appVersion, { color: C.textMuted }]}>v2.0.0 · Quran & Hadith companion</Text>
           <Text style={[styles.appDesc, { color: C.textSecondary }]}>
             Complete Quran with word-by-word, authentic Hadith, Duas, AI Guide, 99 Names, Islamic Names, Ramadan Companion, Hajj Guide, Prayer Times, Qibla, Tasbeeh & more.
           </Text>

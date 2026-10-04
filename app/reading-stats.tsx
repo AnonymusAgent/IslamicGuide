@@ -607,7 +607,7 @@ export default function ReadingStatsScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.languageNoteTitle, { color: C.warning }]}>Online Source Language Note</Text>
                   <Text style={[styles.languageNoteText, { color: C.textSecondary }]}>
-                    The online Hadith source (api.hadith.gading.dev) provides Arabic text and Indonesian translations. The 180+ verified offline hadiths include full English translations. Search the offline corpus for English content.
+                    The primary Hadith API provides Arabic and Indonesian translations; the fallback editions provide Arabic and English text with section references. Curated offline records remain available when a network is unavailable.
                   </Text>
                 </View>
               </View>

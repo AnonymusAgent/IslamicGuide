@@ -45,7 +45,7 @@ export default function HadithIndexScreen() {
         <View style={[styles.offlineBadge, { backgroundColor: `${C.success}20`, borderColor: `${C.success}30` }]}>
           <MaterialIcons name="offline-bolt" size={13} color={C.success} />
           <Text style={[styles.offlineBadgeText, { color: C.success }]}>
-            All collections available offline — no internet required
+            Collections download online and are cached for later reading
           </Text>
         </View>
       </LinearGradient>
@@ -85,8 +85,7 @@ export default function HadithIndexScreen() {
         ListHeaderComponent={
           <View style={[styles.intro, { backgroundColor: `${C.primary}20`, borderColor: `${C.primary}40` }]}>
             <Text style={[styles.introText, { color: C.textSecondary }]}>
-              The six authentic hadith collections (Kutub al-Sittah) plus Riyad as-Salihin and Nawawi's 40 Hadiths.
-              All core hadiths are stored offline — verified, complete, and accessible without internet.
+              Browse the Kutub al-Sittah, Riyad as-Salihin, and Nawawi's 40 Hadiths. Online editions are cached on this device; curated offline records remain available without a connection.
             </Text>
           </View>
         }

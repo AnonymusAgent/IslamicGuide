@@ -27,6 +27,9 @@ STRICT RULES:
 9. Be respectful, scholarly, and thorough
 10. For non-Islamic topics: "I am an Islamic guidance assistant. Please ask about Islamic topics."`;
 
+const AI_API_URL = process.env.EXPO_PUBLIC_AI_API_URL?.trim();
+const AI_MODEL = process.env.EXPO_PUBLIC_AI_MODEL?.trim() || 'google/gemini-3-flash-preview';
+
 // ── Suggested Questions ──────────────────────────────────────────────────────
 
 const SUGGESTED_QUESTIONS = [
@@ -99,14 +102,15 @@ export default function AIGuideScreen() {
     }));
 
     try {
-      const response = await fetch('https://api.onspace.ai/ai/v1/chat/completions', {
+      if (!AI_API_URL) throw new Error('AI_BACKEND_NOT_CONFIGURED');
+
+      const response = await fetch(AI_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer onspace-public',
         },
         body: JSON.stringify({
-          model: 'google/gemini-3-flash-preview',
+          model: AI_MODEL,
           messages: [
             { role: 'system', content: ISLAMIC_SYSTEM_PROMPT },
             ...contextMessages,
@@ -156,14 +160,17 @@ export default function AIGuideScreen() {
           updateConversationTitle(activeConversationId, shortTitle);
         }
       }
-    } catch {
+    } catch (error) {
       setStreamingText('');
+      const failureMessage = error instanceof Error && error.message === 'AI_BACKEND_NOT_CONFIGURED'
+        ? 'AI responses are not configured. Set EXPO_PUBLIC_AI_API_URL to a trusted server endpoint. Keep provider credentials on that server, never in the mobile app.'
+        : 'I am unable to connect right now. Please check your internet connection and try again.';
       await addAIMessage({
         role: 'assistant',
         content: [
-          '**Connection Error**',
+          AI_API_URL ? '**Connection Error**' : '**AI Service Not Configured**',
           '',
-          'I am unable to connect right now. Please check your internet connection and try again.',
+          failureMessage,
           '',
           'In the meantime, explore the **Quran**, **Hadith**, and **Duas** sections for authentic Islamic guidance.',
         ].join('\n'),
@@ -252,8 +259,10 @@ export default function AIGuideScreen() {
           <View style={styles.headerInfo}>
             <Text style={[styles.headerTitle, { color: C.textPrimary }]}>AI Islamic Guide</Text>
             <View style={styles.headerMeta}>
-              <View style={[styles.onlineDot, { backgroundColor: C.success }]} />
-              <Text style={[styles.headerSub, { color: C.textSecondary }]}>Powered by Gemini 3 · Cites Quran & Hadith</Text>
+              <View style={[styles.onlineDot, { backgroundColor: AI_API_URL ? C.success : C.warning }]} />
+              <Text style={[styles.headerSub, { color: C.textSecondary }]}>
+                {AI_API_URL ? 'AI endpoint configured · Cites Quran & Hadith' : 'AI service not configured'}
+              </Text>
             </View>
           </View>
           <View style={styles.headerActions}>

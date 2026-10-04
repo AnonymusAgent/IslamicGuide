@@ -1,7 +1,5 @@
 /**
- * Profile Screen — Shows authentication status with Supabase connect prompt,
- * and displays local data summary (bookmarks, notes, reading progress, AI history).
- * Full cloud sync activates once the user connects their Supabase project.
+ * Profile Screen — Shows local account status and data summary.
  */
 
 import React from 'react';
@@ -82,13 +80,13 @@ export default function ProfileScreen() {
           <View style={styles.connectInfo}>
             <Text style={[styles.connectTitle, { color: C.textPrimary }]}>Enable Cloud Sync</Text>
             <Text style={[styles.connectDesc, { color: C.textSecondary }]}>
-              Connect your Supabase project to sync bookmarks, notes, reading progress, and AI history across all your devices. Sign up is free.
+              Cloud sync is not configured. Bookmarks, notes, reading progress, and AI history stay on this device for now.
             </Text>
             <View style={styles.connectSteps}>
               {[
-                'Go to OnSpace → Connect Supabase',
-                'Enable email/password auth in Supabase',
-                'Return here to sign in',
+                'Configure a secure account API on your server',
+                'Enable authentication on that API',
+                'Connect this app through the server API',
               ].map((step, i) => (
                 <View key={i} style={styles.connectStep}>
                   <View style={[styles.stepNum, { backgroundColor: `${C.gold}20` }]}>
@@ -110,7 +108,7 @@ export default function ProfileScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.authStatusTitle, { color: C.warning }]}>Not Connected</Text>
                 <Text style={[styles.authStatusSub, { color: C.textMuted }]}>
-                  Backend not configured. Connect Supabase to enable authentication.
+                  Sign-in is unavailable until a secure account backend is configured.
                 </Text>
               </View>
             </View>
@@ -128,7 +126,7 @@ export default function ProfileScreen() {
               <View style={[styles.disabledBtn, { backgroundColor: C.cardBorder }]}>
                 <MaterialIcons name="lock" size={16} color={C.textMuted} />
                 <Text style={[styles.disabledBtnText, { color: C.textMuted }]}>
-                  Connect Supabase to Enable Sign In
+                  Authentication Not Configured
                 </Text>
               </View>
               <Text style={[styles.authFormNote, { color: C.textMuted }]}>
@@ -148,7 +146,7 @@ export default function ProfileScreen() {
             </View>
           </View>
           <Text style={[styles.sectionDesc, { color: C.textMuted }]}>
-            Your data is saved on this device. Connect Supabase to back it up to the cloud.
+            Your data is saved on this device. Cloud backup is not configured.
           </Text>
 
           <View style={[styles.dataList, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
@@ -199,7 +197,7 @@ export default function ProfileScreen() {
             <View style={[styles.syncFooter, { borderTopColor: C.cardBorder }]}>
               <MaterialIcons name="info-outline" size={13} color={C.textMuted} />
               <Text style={[styles.syncFooterText, { color: C.textMuted }]}>
-                Connect Supabase to enable real-time cloud sync and access your data on any device.
+                Secure account sync is not configured for this app.
               </Text>
             </View>
           </View>

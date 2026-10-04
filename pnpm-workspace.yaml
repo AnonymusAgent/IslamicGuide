@@ -1,0 +1,6 @@
+overrides:
+  caniuse-lite: 1.0.30001814
+
+allowBuilds:
+  esbuild: false
+  unrs-resolver: false

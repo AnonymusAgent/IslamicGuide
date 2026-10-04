@@ -1,13 +1,13 @@
-# Welcome to WebLoom project
+# IslamicGuide
+
+IslamicGuide is an Expo and React Native mobile app for Quran, Hadith, duas, prayer tools, and personal tracking.
 
 ## Getting Started
 
 ### 1. Install Dependencies
 
 ```bash
-npm install
-# or
-yarn install
+corepack pnpm install
 ```
 
 ### 2. Start the Project
@@ -15,38 +15,36 @@ yarn install
 - Start the development server (choose your platform):
 
 ```bash
-npm run start         # Start Expo development server
-npm run android       # Launch Android emulator
-npm run ios           # Launch iOS simulator
-npm run web           # Start the web version
+corepack pnpm start
+corepack pnpm android
+corepack pnpm ios
+corepack pnpm web
 ```
 
 - Reset the project (clear cache, etc.):
 
 ```bash
-npm run reset-project
+corepack pnpm reset-project
 ```
 
 ### 3. Lint the Code
 
 ```bash
-npm run lint
+corepack pnpm lint
 ```
 
 ## Main Dependencies
 
-- React Native: 0.79.4
+- React Native: 0.79.3
 - React: 19.0.0
 - Expo: ~53.0.12
-- Expo Router: ~5.1.0
-- Supabase: ^2.50.0
-- Other commonly used libraries:  
-  - @expo/vector-icons  
-  - react-native-paper  
-  - react-native-calendars  
-  - lottie-react-native  
-  - react-native-webview  
-  - and more
+- Expo Router: ~5.0.7
+- Hadith: api.hadith.gading.dev with cached Arabic/English editions from the Fawaz Hadith API as fallback
+- Other commonly used libraries:
+  - @expo/vector-icons
+  - React Navigation
+  - AsyncStorage
+  - Expo Location, Notifications, Sensors, and FileSystem
 
 For a full list of dependencies, see [package.json](./package.json).
 
@@ -58,12 +56,10 @@ For a full list of dependencies, see [package.json](./package.json).
 
 ## Contributing
 
-1. Fork this repository
-2. Create a new branch (`git checkout -b main`)
-3. Commit your changes (`git commit -am 'Add new feature'`)
-4. Push to the branch (`git push origin feature/your-feature`)
-5. Open a Pull Request
+1. Fork this repository.
+2. Create a feature branch.
+3. Commit your changes and open a pull request.
 
 ## License
 
-This project is liscenced to WebLoom. For collaboration inquiries, please contact the author.
+See the repository license for usage terms.

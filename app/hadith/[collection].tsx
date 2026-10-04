@@ -12,7 +12,7 @@ import { HADITH_COLLECTIONS } from '../../constants/hadithData';
 import { getOfflineHadiths, OfflineHadith } from '../../constants/offlineHadithDb';
 import { useApp } from '../../contexts/AppContext';
 import {
-  fetchHadithPage, totalPages, COLLECTION_TOTAL, COLLECTION_API_MAP,
+  fetchHadithPage, totalPages, getCollectionTotal, isOnlineCollection, COLLECTION_API_MAP,
   HadithAPIItem,
 } from '../../services/hadithService';
 
@@ -45,11 +45,11 @@ function fromOnline(h: HadithAPIItem, collection: string): UnifiedHadith {
     number: h.number,
     arabic: h.arab || '',
     english: h.id || 'Translation not available in English for this hadith.',
-    narrator: '—',
-    grade: 'Refer to source',
-    reference: `${collection} #${h.number}`,
-    bookName: COLLECTION_API_MAP[collection] || collection,
-    chapterName: '',
+    narrator: h.narrator || '—',
+    grade: h.grade || 'Refer to source',
+    reference: h.reference || `${collection} #${h.number}`,
+    bookName: h.bookName || COLLECTION_API_MAP[collection] || collection,
+    chapterName: h.chapterName || '',
     source: 'online',
   };
 }
@@ -64,14 +64,14 @@ export default function HadithCollectionScreen() {
 
   const collectionId = collection || 'nawawi40';
   const meta = HADITH_COLLECTIONS.find(c => c.id === collectionId);
-  const hasOnlineSource = !!COLLECTION_API_MAP[collectionId];
-  const knownTotal = COLLECTION_TOTAL[collectionId] ?? 0;
+  const hasOnlineSource = isOnlineCollection(collectionId);
+  const knownTotal = getCollectionTotal(collectionId);
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [hadiths, setHadiths] = useState<UnifiedHadith[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
   const [loadingOnline, setLoadingOnline] = useState(false);
   const [onlineError, setOnlineError] = useState(false);
   const [allPagesLoaded, setAllPagesLoaded] = useState(false);
@@ -98,7 +98,9 @@ export default function HadithCollectionScreen() {
     try {
       const items = await fetchHadithPage(collectionId, page);
       if (!items || items.length === 0) {
-        setAllPagesLoaded(true);
+        const exhausted = page > totalPages(collectionId);
+        setOnlineError(!exhausted);
+        setAllPagesLoaded(exhausted);
         return;
       }
       const newOnes = items.map(h => fromOnline(h, collectionId));
@@ -288,7 +290,7 @@ export default function HadithCollectionScreen() {
       return (
         <Pressable
           style={[styles.retryBtn, { backgroundColor: `${C.gold}15`, borderColor: `${C.gold}30` }]}
-          onPress={() => loadNextPage(currentPage, hadiths.filter(h => h.source === 'offline'))}
+          onPress={() => loadNextPage(currentPage + 1, hadiths)}
         >
           <MaterialIcons name="refresh" size={16} color={C.gold} />
           <Text style={[styles.retryText, { color: C.gold }]}>Retry online load</Text>
@@ -421,13 +423,24 @@ export default function HadithCollectionScreen() {
             color={C.textMuted}
           />
           <Text style={[styles.emptyTitle, { color: C.textPrimary }]}>
-            {searchQuery.trim() ? 'No Results Found' : 'Loading Collection...'}
+            {searchQuery.trim() ? 'No Results Found' : onlineError ? 'Unable to Load Collection' : 'Loading Collection...'}
           </Text>
           <Text style={[styles.emptyDesc, { color: C.textMuted }]}>
             {searchQuery.trim()
               ? 'Try different keywords or load more hadiths first.'
-              : 'Fetching from the online database. Please wait.'}
+              : onlineError
+                ? 'The online sources are unavailable. Please check your connection and retry.'
+                : 'Fetching from the online database. Please wait.'}
           </Text>
+          {onlineError && hasOnlineSource ? (
+            <Pressable
+              style={[styles.retryBtn, { backgroundColor: `${C.gold}15`, borderColor: `${C.gold}30` }]}
+              onPress={() => loadNextPage(currentPage + 1)}
+            >
+              <MaterialIcons name="refresh" size={16} color={C.gold} />
+              <Text style={[styles.retryText, { color: C.gold }]}>Retry online load</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : (
         <FlatList
